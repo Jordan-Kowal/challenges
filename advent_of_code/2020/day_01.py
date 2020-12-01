@@ -10,8 +10,7 @@ from _shared import read_input
 # --------------------------------------------------------------------------------
 # > Main
 # --------------------------------------------------------------------------------
-values = read_input("day_01.txt")
-values = [int(v) for v in values]
+values = [int(v) for v in read_input("day_01.txt")]
 for a, b, c in combinations(values, 3):
     if (a + b + c) == 2020:
         print(a * b * c)
