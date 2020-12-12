@@ -3,7 +3,6 @@
 
 # Built-in
 import re
-from enum import Enum
 
 # Personal
 from _shared import read_input
