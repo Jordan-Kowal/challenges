@@ -257,7 +257,7 @@ grid = Grid.from_file_content(file_content)
 # Problem 1
 grid.problem_1()
 occupied_spots = [spot for spot in grid.spots if spot.status == Spot.Status.OCCUPIED]
-print(len(occupied_spots))  # 2261
+print(len(occupied_spots))
 grid.reset()
 
 # Problem 2
