@@ -2,7 +2,6 @@
 
 # Built-in
 from functools import reduce
-from math import gcd
 
 # Personal
 from _shared import read_input
