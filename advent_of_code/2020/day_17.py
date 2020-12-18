@@ -3,6 +3,7 @@
 
 # Built-in
 from itertools import product
+from time import perf_counter
 
 # Personal
 from _shared import read_input
@@ -12,14 +13,12 @@ from _shared import read_input
 # > Helpers
 # --------------------------------------------------------------------------------
 class Grid:
-    def __init__(self, cubes, width):
+    def __init__(self, cubes):
         """
         Creates a grid with stupid cubes
         :param {Cubes} cubes: Initial cubes that make the grid
-        :param width: The length of the x or y dimension
         """
         self.cubes = {cube.coordinates: cube for cube in cubes}
-        self.width = width
         self.cycle = 0
 
     def run_cycles(self, n):
@@ -35,23 +34,13 @@ class Grid:
             print(len(self.cubes), len(active_cubes))
 
     def expand(self):
-        """
-        Increase all of our grid dimension by 2, as if we were wrapping it in a bigger grid
-        Generates and stores all the new cubes, which start as inactive
-        """
-        self.width += 2
-        # Expansion happens from both sides of each expansion
-        length_range = self.width - 1 if self.width % 2 else self.width
-        min_ = -int(length_range / 2)
-        max_ = int(length_range / 2)
-        possible_x_values = list(range(min_, max_ + 1))
-        all_coordinates = set(product(possible_x_values, repeat=4))
-        # Now we create the missing cubes following the expansion
-        existing_coordinates = set(self.cubes.keys())
-        for coordinates in all_coordinates:
-            if coordinates not in existing_coordinates:
-                x, y, z, w = coordinates
-                self.cubes[(x, y, z, w)] = Cube(x, y, z, w, False)
+        """Generate cubes for active cubes that have missing neighbors"""
+        active_cubes = [cube for cube in self.cubes.values() if cube.active]
+        for cube in active_cubes:
+            for coordinates in cube.neighbor_coordinates:
+                if coordinates not in self.cubes:
+                    x, y, z, w = coordinates
+                    self.cubes[(x, y, z, w)] = Cube(x, y, z, w, False)
 
     def update_cubes(self):
         """For each of our cube, computes the next state and then update them"""
@@ -131,6 +120,7 @@ class Cube:
 # --------------------------------------------------------------------------------
 # > Main
 # --------------------------------------------------------------------------------
+start = perf_counter()
 content = read_input("day_17.txt")
 
 # Creates the cubes with the right coordinates
@@ -147,5 +137,8 @@ for x, line in zip(range(min_, max_ + 1), content):
         cubes.add(cube)
 
 # Run the program
-grid = Grid(cubes, len(content))
+grid = Grid(cubes)
 grid.run_cycles(6)
+
+end = perf_counter()
+print(end - start)
