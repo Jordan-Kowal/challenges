@@ -1,4 +1,4 @@
-"""Day 22 challenge"""
+"""Day 23 challenge"""
 
 # Built-in
 from time import perf_counter
