@@ -1,4 +1,4 @@
-"""Day 23 challenge"""
+"""Day 24 challenge"""
 
 # Built-in
 import re
