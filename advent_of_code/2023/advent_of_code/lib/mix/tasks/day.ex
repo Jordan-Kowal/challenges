@@ -1,4 +1,8 @@
-defmodule Mix.Tasks.Day1 do
+defmodule Mix.Tasks.Day do
+  @moduledoc """
+  Copy-paste this file to create a new day task.
+  """
+
   use AdventOfCode.DayTask
 
   @impl AdventOfCode.DayTask

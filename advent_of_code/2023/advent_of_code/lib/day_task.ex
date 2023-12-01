@@ -1,7 +1,8 @@
 defmodule AdventOfCode.DayTask do
-  @callback part1(data :: String.t()) :: any()
-  @callback part2(data :: String.t(), p1_result :: any()) :: any()
-  @callback parse_input(input :: String.t()) :: any()
+  @callback parse_input_p1(input :: String.t()) :: any()
+  @callback parse_input_p2(input :: String.t()) :: any()
+  @callback solve_p1(data :: String.t()) :: any()
+  @callback solve_p2(data :: String.t(), p1_result :: any()) :: any()
 
   defmacro __using__(_opts) do
     quote do
@@ -15,38 +16,26 @@ defmodule AdventOfCode.DayTask do
       """
       @spec run(binary()) :: any()
       def run(_) do
-        {time, _} =
+        {micro_seconds, p1_result} =
           :timer.tc(fn ->
-            IO.puts("Solving #{module_name()}")
-            input = log_func_call(fn -> read_input() end, :read_input)
-            data = log_func_call(fn -> parse_input(input) end, :parse_input)
-            p1_result = log_func_call(fn -> part1(data) end, :part1, true)
-            _p2_result = log_func_call(fn -> part2(data, p1_result) end, :part2, true)
+            read_input()
+            |> parse_input_p1()
+            |> solve_p1()
           end)
 
-        IO.puts("Total time: #{time / 1_000_000}s")
+        seconds = Float.round(micro_seconds / 1_000_000, 4)
+        IO.puts("(#{seconds}s) P1 -> #{inspect(p1_result)}")
+
+        {micro_seconds, p2_result} =
+          :timer.tc(fn ->
+            read_input()
+            |> parse_input_p2()
+            |> solve_p2(p1_result)
+          end)
+
+        seconds = Float.round(micro_seconds / 1_000_000, 4)
+        IO.puts("(#{seconds}s) P2 -> #{inspect(p2_result)}")
       end
-
-      @impl AdventOfCode.DayTask
-      @doc """
-      Parses the input for the day.
-      """
-      @spec parse_input(String.t()) :: any()
-      def parse_input(input), do: input
-
-      @impl AdventOfCode.DayTask
-      @doc """
-      Solves part 1 of the puzzle for the day.
-      """
-      @spec part1(String.t()) :: any()
-      def part1(_data), do: :ok
-
-      @impl AdventOfCode.DayTask
-      @doc """
-      Solves part 2 of the puzzle for the day.
-      """
-      @spec part2(String.t(), any()) :: any()
-      def part2(_data, _p1_result), do: :ok
 
       # Reads the input file for the day.
       @spec read_input() :: String.t()
@@ -72,9 +61,9 @@ defmodule AdventOfCode.DayTask do
         seconds = micro_seconds / 1_000_000
 
         if print_output do
-          IO.puts("#{name} -> #{inspect(output)} (#{seconds}s)")
+          IO.puts("(#{seconds}s) #{name} -> #{inspect(output)}")
         else
-          IO.puts("#{name} (#{seconds}s)")
+          IO.puts("(#{seconds}s) #{name}")
         end
 
         output
