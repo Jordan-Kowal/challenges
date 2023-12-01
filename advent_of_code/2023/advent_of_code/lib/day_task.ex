@@ -1,4 +1,9 @@
 defmodule AdventOfCode.DayTask do
+  @moduledoc """
+  Basic Mix.Task template for an Advent of Code day.
+  Defines both a behaviour and a macro.
+  """
+
   @callback solve_p1(lines :: [String.t()]) :: any()
   @callback solve_p2(lines :: [String.t()], p1_result :: any()) :: any()
 
@@ -9,35 +14,25 @@ defmodule AdventOfCode.DayTask do
       @behaviour AdventOfCode.DayTask
 
       @impl Mix.Task
-      @doc """
-      Runs the task to solve the puzzle for the day.
-      """
+      @doc "Runs the task to solve the puzzle for the day."
       @spec run(binary()) :: any()
       def run(opts) do
         [silent: silent] = parse_options(opts)
         # Read input
         {micro_seconds, lines} = :timer.tc(fn -> read_input() end)
         read_seconds = micro_seconds / 1_000_000
-
-        unless silent do
-          IO.puts("(#{Float.round(read_seconds, 5)}s) Read input")
-        end
-
         # P1
         {micro_seconds, p1_result} = :timer.tc(fn -> solve_p1(lines) end)
         p1_seconds = micro_seconds / 1_000_000
-
-        unless silent do
-          IO.puts("(#{Float.round(p1_seconds, 5)}s) P1 -> #{inspect(p1_result)}")
-        end
-
         # P2
         {micro_seconds, p2_result} = :timer.tc(fn -> solve_p2(lines, p1_result) end)
         p2_seconds = micro_seconds / 1_000_000
 
         unless silent do
+          IO.puts("(#{Float.round(read_seconds, 5)}s) Read input")
+          IO.puts("(#{Float.round(p1_seconds, 5)}s) P1 -> #{inspect(p1_result)}")
           IO.puts("(#{Float.round(p2_seconds, 5)}s) P2 -> #{inspect(p2_result)}")
-          IO.puts("(#{Float.round(read_seconds + p1_seconds + p2_seconds, 5)}s) Total")
+          IO.puts("Done in #{Float.round(read_seconds + p1_seconds + p2_seconds, 5)}s")
         end
 
         {read_seconds, p1_seconds, p2_seconds}
@@ -58,9 +53,7 @@ defmodule AdventOfCode.DayTask do
         String.split(input, "\n")
       end
 
-      @doc """
-      Returns the last part of the module name.
-      """
+      @doc "Returns the last part of the module name."
       @spec module_name() :: String.t()
       def module_name() do
         __MODULE__

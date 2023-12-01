@@ -1,4 +1,8 @@
 defmodule Mix.Tasks.Benchmark do
+  @moduledoc """
+  Runs all days and prints the execution time of each day/part.
+  """
+
   use Mix.Task
 
   alias Mix.Tasks.{Day1}

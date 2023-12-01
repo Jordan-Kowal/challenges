@@ -1,4 +1,6 @@
 defmodule Mix.Tasks.Day1 do
+  @moduledoc "Day 1"
+
   use AdventOfCode.DayTask
 
   @first_and_last_digits_regex ~r/^\D*(\d).*?(\d)\D*$/
