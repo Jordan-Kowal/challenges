@@ -3,21 +3,14 @@ defmodule Mix.Tasks.Day1 do
 
   @first_and_last_digits_regex ~r/^\D*(\d).*?(\d)\D*$/
   @first_digit_regex ~r/(\d)/
-  @word_and_digit_regex ~r/(one|two|three|four|five|six|seven|eight|nine|\d)/i
 
   @impl AdventOfCode.DayTask
   def solve_p1(lines) do
     lines
     |> Enum.filter(fn line -> line != "" end)
     |> Enum.map(fn line ->
-      case Regex.run(@first_and_last_digits_regex, line) do
-        [_, first, last] ->
-          String.to_integer("#{first}#{last}")
-
-        _ ->
-          [_, first] = Regex.run(@first_digit_regex, line)
-          String.to_integer("#{first}#{first}")
-      end
+      {first, last} = match_first_and_last_digits(line)
+      String.to_integer("#{first}#{last}")
     end)
     |> Enum.sum()
   end
@@ -39,11 +32,22 @@ defmodule Mix.Tasks.Day1 do
         |> String.replace("eight", "e8ight")
         |> String.replace("nine", "n9ine")
 
-      matches = Regex.scan(@word_and_digit_regex, line)
-      [first, _] = hd(matches)
-      [last, _] = List.last(matches)
+      {first, last} = match_first_and_last_digits(line)
       String.to_integer("#{first}#{last}")
     end)
     |> Enum.sum()
+  end
+
+  # Returns the first and last digits of the line.
+  @spec match_first_and_last_digits(String.t()) :: {String.t(), String.t()}
+  defp match_first_and_last_digits(line) do
+    case Regex.run(@first_and_last_digits_regex, line) do
+      [_, first, last] ->
+        {first, last}
+
+      _ ->
+        [_, first] = Regex.run(@first_digit_regex, line)
+        {first, first}
+    end
   end
 end
