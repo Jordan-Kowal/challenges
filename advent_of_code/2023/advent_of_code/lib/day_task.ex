@@ -20,7 +20,7 @@ defmodule AdventOfCode.DayTask do
         read_seconds = micro_seconds / 1_000_000
 
         unless silent do
-          IO.puts("(#{Float.round(read_seconds, 3)}s) Read input")
+          IO.puts("(#{Float.round(read_seconds, 5)}s) Read input")
         end
 
         # P1
@@ -28,7 +28,7 @@ defmodule AdventOfCode.DayTask do
         p1_seconds = micro_seconds / 1_000_000
 
         unless silent do
-          IO.puts("(#{Float.round(p1_seconds, 3)}s) P1 -> #{inspect(p1_result)}")
+          IO.puts("(#{Float.round(p1_seconds, 5)}s) P1 -> #{inspect(p1_result)}")
         end
 
         # P2
@@ -36,7 +36,8 @@ defmodule AdventOfCode.DayTask do
         p2_seconds = micro_seconds / 1_000_000
 
         unless silent do
-          IO.puts("(#{Float.round(p2_seconds, 3)}s) P2 -> #{inspect(p2_result)}")
+          IO.puts("(#{Float.round(p2_seconds, 5)}s) P2 -> #{inspect(p2_result)}")
+          IO.puts("(#{Float.round(read_seconds + p1_seconds + p2_seconds, 5)}s) Total")
         end
 
         {read_seconds, p1_seconds, p2_seconds}
