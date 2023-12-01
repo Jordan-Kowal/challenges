@@ -19,9 +19,4 @@ defmodule Mix.Tasks.Day do
   def parse_input_p1(input) do
     input
   end
-
-  @impl AdventOfCode.DayTask
-  def parse_input_p2(input) do
-    parse_input_p1(input)
-  end
 end

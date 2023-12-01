@@ -52,22 +52,10 @@ defmodule AdventOfCode.DayTask do
         input
       end
 
-      # Times a function call and logs the result.
-      @spec log_func_call((any() -> any()), String.t(), boolean()) :: integer()
-      defp log_func_call(func, name, print_output \\ false)
-
-      defp log_func_call(func, name, print_output) do
-        {micro_seconds, output} = :timer.tc(func)
-        seconds = micro_seconds / 1_000_000
-
-        if print_output do
-          IO.puts("(#{seconds}s) #{name} -> #{inspect(output)}")
-        else
-          IO.puts("(#{seconds}s) #{name}")
-        end
-
-        output
-      end
+      # Default implementation that re-uses parse_input_p1.
+      @impl AdventOfCode.DayTask
+      @spec parse_input_p2(input :: String.t()) :: any()
+      def parse_input_p2(input), do: parse_input_p1(input)
 
       # Returns the last part of the module name.
       @spec module_name() :: String.t()
