@@ -13,24 +13,33 @@ defmodule AdventOfCode.DayTask do
       Runs the task to solve the puzzle for the day.
       """
       @spec run(binary()) :: any()
-      def run(_) do
-        {micro_seconds, p1_result} =
-          :timer.tc(fn ->
-            read_input()
-            |> solve_p1()
-          end)
+      def run(opts) do
+        [silent: silent] = parse_options(opts)
+        # Read input
+        {micro_seconds, lines} = :timer.tc(fn -> read_input() end)
+        read_seconds = micro_seconds / 1_000_000
 
-        seconds = Float.round(micro_seconds / 1_000_000, 3)
-        IO.puts("(#{seconds}s) P1 -> #{inspect(p1_result)}")
+        unless silent do
+          IO.puts("(#{Float.round(read_seconds, 3)}s) Read input")
+        end
 
-        {micro_seconds, p2_result} =
-          :timer.tc(fn ->
-            read_input()
-            |> solve_p2(p1_result)
-          end)
+        # P1
+        {micro_seconds, p1_result} = :timer.tc(fn -> solve_p1(lines) end)
+        p1_seconds = micro_seconds / 1_000_000
 
-        seconds = Float.round(micro_seconds / 1_000_000, 3)
-        IO.puts("(#{seconds}s) P2 -> #{inspect(p2_result)}")
+        unless silent do
+          IO.puts("(#{Float.round(p1_seconds, 3)}s) P1 -> #{inspect(p1_result)}")
+        end
+
+        # P2
+        {micro_seconds, p2_result} = :timer.tc(fn -> solve_p2(lines, p1_result) end)
+        p2_seconds = micro_seconds / 1_000_000
+
+        unless silent do
+          IO.puts("(#{Float.round(p2_seconds, 3)}s) P2 -> #{inspect(p2_result)}")
+        end
+
+        {read_seconds, p1_seconds, p2_seconds}
       end
 
       # Reads the input file for the day.
@@ -48,13 +57,20 @@ defmodule AdventOfCode.DayTask do
         String.split(input, "\n")
       end
 
-      # Returns the last part of the module name.
+      @doc """
+      Returns the last part of the module name.
+      """
       @spec module_name() :: String.t()
-      defp module_name() do
+      def module_name() do
         __MODULE__
         |> to_string()
         |> String.split(".")
         |> List.last()
+      end
+
+      defp parse_options(args) do
+        {opts, _} = OptionParser.parse!(args, strict: [silent: :boolean])
+        [silent: opts[:silent] || false]
       end
     end
   end
