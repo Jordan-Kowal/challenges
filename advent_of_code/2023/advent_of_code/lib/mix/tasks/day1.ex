@@ -29,15 +29,15 @@ defmodule Mix.Tasks.Day1 do
     |> Enum.map(fn line ->
       line =
         line
-        |> String.replace(~r/one/, "o1ne")
-        |> String.replace(~r/two/, "t2wo")
-        |> String.replace(~r/three/, "t3hree")
-        |> String.replace(~r/four/, "f4our")
-        |> String.replace(~r/five/, "f5ive")
-        |> String.replace(~r/six/, "s6ix")
-        |> String.replace(~r/seven/, "s7even")
-        |> String.replace(~r/eight/, "e8ight")
-        |> String.replace(~r/nine/, "n9ine")
+        |> String.replace("one", "o1ne")
+        |> String.replace("two", "t2wo")
+        |> String.replace("three", "t3hree")
+        |> String.replace("four", "f4our")
+        |> String.replace("five", "f5ive")
+        |> String.replace("six", "s6ix")
+        |> String.replace("seven", "s7even")
+        |> String.replace("eight", "e8ight")
+        |> String.replace("nine", "n9ine")
 
       matches = Regex.scan(@word_and_digit_regex, line)
       [first, _] = hd(matches)
