@@ -19,24 +19,18 @@ defmodule AdventOfCode.DayTask do
       def run(opts) do
         [silent: silent] = parse_options(opts)
 
-        {read_time, lines} = :timer.tc(fn -> read_input() end)
-        p1_task = Task.async(fn -> :timer.tc(fn -> solve_p1(lines) end) end)
-        p2_task = Task.async(fn -> :timer.tc(fn -> solve_p2(lines) end) end)
-        [{p1_time, p1_result}, {p2_time, p2_result}] = Task.await_many([p1_task, p2_task])
-
+        lines = read_input()
+        {p1_time, p1_result} = :timer.tc(fn -> solve_p1(lines) end)
+        {p2_time, p2_result} = :timer.tc(fn -> solve_p2(lines) end)
         p1_seconds = p1_time / 1_000_000
         p2_seconds = p2_time / 1_000_000
-        read_seconds = read_time / 1_000_000
 
         unless silent do
-          IO.puts("(#{Float.round(read_seconds, 5)}s) Read input")
           IO.puts("(#{Float.round(p1_seconds, 5)}s) P1 -> #{inspect(p1_result)}")
           IO.puts("(#{Float.round(p2_seconds, 5)}s) P2 -> #{inspect(p2_result)}")
-          total_s = Float.round(read_seconds + max(p1_seconds, p2_seconds), 5)
-          IO.puts("Done in #{total_s}s")
         end
 
-        {read_seconds, p1_seconds, p2_seconds}
+        {p1_seconds, p2_seconds}
       end
 
       # Reads the input file for the day.

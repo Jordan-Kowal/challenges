@@ -5,9 +5,9 @@ defmodule Mix.Tasks.Benchmark do
 
   use Mix.Task
 
-  alias Mix.Tasks.{Day1}
+  alias Mix.Tasks.{Day1, Day2}
 
-  @modules [Day1]
+  @modules [Day1, Day2]
   @padding 10
   @iterations 1
 
@@ -16,7 +16,6 @@ defmodule Mix.Tasks.Benchmark do
 
     """
     #{String.pad_trailing("Day", @padding)}
-    #{String.pad_trailing("Read", @padding)}
     #{String.pad_trailing("P1", @padding)}
     #{String.pad_trailing("P2", @padding)}
     """
@@ -40,7 +39,6 @@ defmodule Mix.Tasks.Benchmark do
 
     """
     #{String.pad_trailing(module.module_name(), @padding)}
-    #{String.pad_trailing("#{inspect(Float.round(read_first, 5))}s", @padding)}
     #{String.pad_trailing("#{inspect(Float.round(p1_avg, 5))}s", @padding)}
     #{String.pad_trailing("#{inspect(Float.round(p2_avg, 5))}s", @padding)}
     """
