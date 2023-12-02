@@ -28,14 +28,11 @@ defmodule Mix.Tasks.Benchmark do
   defp run_benchmark(module) do
     results = Enum.map(1..@iterations, fn _ -> module.run(["--silent"]) end)
 
-    read_times = Enum.map(results, fn {x, _, _} -> x end)
-    p1_times = Enum.map(results, fn {_, x, _} -> x end)
-    p2_times = Enum.map(results, fn {_, _, x} -> x end)
+    p1_times = Enum.map(results, fn {x, _} -> x end)
+    p2_times = Enum.map(results, fn {_, x} -> x end)
 
-    count = length(read_times)
-    read_first = hd(read_times)
-    p1_avg = Enum.sum(p1_times) / count
-    p2_avg = Enum.sum(p2_times) / count
+    p1_avg = Enum.sum(p1_times) / length(p1_times)
+    p2_avg = Enum.sum(p2_times) / length(p2_times)
 
     """
     #{String.pad_trailing(module.module_name(), @padding)}
