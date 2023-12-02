@@ -9,7 +9,7 @@ defmodule Mix.Tasks.Day do
   end
 
   @impl AdventOfCode.DayTask
-  def solve_p2(_lines, _p1_result) do
+  def solve_p2(_lines) do
     :ok
   end
 end

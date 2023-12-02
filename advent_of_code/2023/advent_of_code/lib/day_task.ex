@@ -5,7 +5,7 @@ defmodule AdventOfCode.DayTask do
   """
 
   @callback solve_p1(lines :: [String.t()]) :: any()
-  @callback solve_p2(lines :: [String.t()], p1_result :: any()) :: any()
+  @callback solve_p2(lines :: [String.t()]) :: any()
 
   defmacro __using__(_opts) do
     quote do
@@ -18,21 +18,22 @@ defmodule AdventOfCode.DayTask do
       @spec run(binary()) :: any()
       def run(opts) do
         [silent: silent] = parse_options(opts)
-        # Read input
-        {micro_seconds, lines} = :timer.tc(fn -> read_input() end)
-        read_seconds = micro_seconds / 1_000_000
-        # P1
-        {micro_seconds, p1_result} = :timer.tc(fn -> solve_p1(lines) end)
-        p1_seconds = micro_seconds / 1_000_000
-        # P2
-        {micro_seconds, p2_result} = :timer.tc(fn -> solve_p2(lines, p1_result) end)
-        p2_seconds = micro_seconds / 1_000_000
+
+        {read_time, lines} = :timer.tc(fn -> read_input() end)
+        p1_task = Task.async(fn -> :timer.tc(fn -> solve_p1(lines) end) end)
+        p2_task = Task.async(fn -> :timer.tc(fn -> solve_p2(lines) end) end)
+        [{p1_time, p1_result}, {p2_time, p2_result}] = Task.await_many([p1_task, p2_task])
+
+        p1_seconds = p1_time / 1_000_000
+        p2_seconds = p2_time / 1_000_000
+        read_seconds = read_time / 1_000_000
 
         unless silent do
           IO.puts("(#{Float.round(read_seconds, 5)}s) Read input")
           IO.puts("(#{Float.round(p1_seconds, 5)}s) P1 -> #{inspect(p1_result)}")
           IO.puts("(#{Float.round(p2_seconds, 5)}s) P2 -> #{inspect(p2_result)}")
-          IO.puts("Done in #{Float.round(read_seconds + p1_seconds + p2_seconds, 5)}s")
+          total_s = Float.round(read_seconds + max(p1_seconds, p2_seconds), 5)
+          IO.puts("Done in #{total_s}s")
         end
 
         {read_seconds, p1_seconds, p2_seconds}

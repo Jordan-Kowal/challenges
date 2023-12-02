@@ -18,7 +18,7 @@ defmodule Mix.Tasks.Day1 do
   end
 
   @impl AdventOfCode.DayTask
-  def solve_p2(lines, _p1_result) do
+  def solve_p2(lines) do
     lines
     |> Enum.filter(fn line -> line != "" end)
     |> Enum.map(fn line ->
