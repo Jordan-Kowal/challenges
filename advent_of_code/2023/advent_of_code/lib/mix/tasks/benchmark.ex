@@ -5,9 +5,9 @@ defmodule Mix.Tasks.Benchmark do
 
   use Mix.Task
 
-  alias Mix.Tasks.{Day1, Day2}
+  alias Mix.Tasks.{Day1, Day2, Day3}
 
-  @modules [Day1, Day2]
+  @modules [Day1, Day2, Day3]
   @padding 10
   @iterations 1
 
