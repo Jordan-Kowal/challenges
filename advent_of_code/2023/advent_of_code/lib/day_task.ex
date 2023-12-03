@@ -43,9 +43,16 @@ defmodule AdventOfCode.DayTask do
           |> String.downcase()
           |> (&(&1 <> ".txt")).()
 
-        filepath = Path.join([project_root, "data", filename])
-        {:ok, input} = File.read(filepath)
-        String.split(input, "\n")
+        lines =
+          Path.join([project_root, "data", filename])
+          |> File.read!()
+          |> String.split("\n")
+
+        if Enum.at(lines, -1) == "" do
+          List.delete_at(lines, -1)
+        else
+          lines
+        end
       end
 
       @doc "Returns the last part of the module name."

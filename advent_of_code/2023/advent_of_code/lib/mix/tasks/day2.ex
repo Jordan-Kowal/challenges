@@ -21,7 +21,6 @@ defmodule Mix.Tasks.Day2 do
   @impl AdventOfCode.DayTask
   def solve_p1(lines) do
     lines
-    |> Enum.filter(fn line -> line != "" end)
     |> Enum.map(&parse_line/1)
     |> Enum.filter(fn {_, color_count_per_round} ->
       bag_has_enough_cubes?(color_count_per_round)
@@ -41,6 +40,8 @@ defmodule Mix.Tasks.Day2 do
   end
 
   @spec parse_line(String.t()) :: {integer(), colors_recap()}
+  defp parse_line(""), do: {0, %{}}
+
   defp parse_line(line) do
     [game_name, rounds_line] = String.split(line, ": ")
     [_, id] = String.split(game_name, " ")

@@ -9,7 +9,6 @@ defmodule Mix.Tasks.Day1 do
   @impl AdventOfCode.DayTask
   def solve_p1(lines) do
     lines
-    |> Enum.filter(fn line -> line != "" end)
     |> Enum.map(fn line ->
       {first, last} = match_first_and_last_digits(line)
       String.to_integer("#{first}#{last}")
@@ -20,7 +19,6 @@ defmodule Mix.Tasks.Day1 do
   @impl AdventOfCode.DayTask
   def solve_p2(lines) do
     lines
-    |> Enum.filter(fn line -> line != "" end)
     |> Enum.map(fn line ->
       line =
         line
