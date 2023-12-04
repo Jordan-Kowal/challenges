@@ -1,3 +1,4 @@
+# credo:disable-for-this-file Credo.Check.Refactor.Nesting
 defmodule Mix.Tasks.Day3 do
   @moduledoc "Day 3"
 
@@ -34,8 +35,9 @@ defmodule Mix.Tasks.Day3 do
     |> Enum.reduce(%{}, fn number, acc ->
       adjacents = compute_adjacent_coordinates(number)
       points = MapSet.intersection(adjacents, engine_positions)
+      count = MapSet.size(points)
 
-      if MapSet.size(points) == 0 do
+      if count == 0 do
         acc
       else
         Enum.reduce(points, acc, fn coordinates, acc2 ->
@@ -55,7 +57,6 @@ defmodule Mix.Tasks.Day3 do
     |> Enum.reduce({[], MapSet.new()}, fn {line, index}, {acc_numbers, acc_chars} ->
       numbers = extract_numbers_from_line(index, line)
       chars = extract_special_characters_coordinates_from_line(index, line)
-      Regex.scan(special_char_regex, line, return: :index)
       {acc_numbers ++ numbers, MapSet.union(acc_chars, MapSet.new(chars))}
     end)
   end
