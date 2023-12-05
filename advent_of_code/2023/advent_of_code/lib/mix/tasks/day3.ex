@@ -56,7 +56,7 @@ defmodule Mix.Tasks.Day3 do
     |> Enum.with_index()
     |> Enum.reduce({[], MapSet.new()}, fn {line, index}, {acc_numbers, acc_chars} ->
       numbers = extract_numbers_from_line(index, line)
-      chars = extract_special_characters_coordinates_from_line(index, line)
+      chars = extract_special_characters_coordinates_from_line(index, line, special_char_regex)
       {acc_numbers ++ numbers, MapSet.union(acc_chars, MapSet.new(chars))}
     end)
   end
@@ -76,11 +76,11 @@ defmodule Mix.Tasks.Day3 do
     end)
   end
 
-  @spec extract_special_characters_coordinates_from_line(integer(), String.t()) :: [
+  @spec extract_special_characters_coordinates_from_line(integer(), String.t(), Regex.t()) :: [
           {integer(), integer()}
         ]
-  defp extract_special_characters_coordinates_from_line(row_number, line) do
-    @special_char_regex
+  defp extract_special_characters_coordinates_from_line(row_number, line, special_char_regex) do
+    special_char_regex
     |> Regex.scan(line, return: :index)
     |> Enum.map(fn [{index, _}, _] -> {row_number, index} end)
   end

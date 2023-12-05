@@ -3,7 +3,7 @@ defmodule Mix.Tasks.Day4 do
 
   use AdventOfCode.DayTask
 
-  @type card :: {integer(), MapSet.t(), MapSet.t()}
+  @type card :: {integer(), MapSet.t(integer()), MapSet.t(integer())}
   @type card_copies :: %{integer() => integer()}
 
   @impl AdventOfCode.DayTask
@@ -30,7 +30,7 @@ defmodule Mix.Tasks.Day4 do
     |> Enum.reduce(0, fn {_, v}, acc -> acc + v end)
   end
 
-  @spec parse_line(String.t()) :: [card()]
+  @spec parse_line(String.t()) :: card()
   defp parse_line(line) do
     # Line example: Card 1: 41 48 83 86 17 | 83 86  6 31 17  9 48 53
     [card_name, numbers] = String.split(line, ": ")
@@ -49,7 +49,7 @@ defmodule Mix.Tasks.Day4 do
     }
   end
 
-  @spec parse_numbers(String.t()) :: MapSet.t()
+  @spec parse_numbers(String.t()) :: MapSet.t(integer())
   defp parse_numbers(numbers) do
     numbers
     |> String.split(" ")

@@ -15,7 +15,7 @@ defmodule AdventOfCode.DayTask do
 
       @impl Mix.Task
       @doc "Runs the task to solve the puzzle for the day."
-      @spec run(binary()) :: any()
+      @spec run([binary()]) :: {float(), float()}
       def run(opts) do
         [silent: silent] = parse_options(opts)
 
@@ -34,7 +34,7 @@ defmodule AdventOfCode.DayTask do
       end
 
       # Reads the input file for the day.
-      @spec read_input() :: String.t()
+      @spec read_input() :: [String.t()]
       defp read_input() do
         project_root = File.cwd!()
 

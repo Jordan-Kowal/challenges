@@ -9,6 +9,7 @@ defmodule Mix.Tasks.Benchmark do
   @padding 10
   @iterations 1
 
+  @impl Mix.Task
   def run(_) do
     IO.puts("Running benchmark...")
 
