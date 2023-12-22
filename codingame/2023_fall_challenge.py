@@ -65,6 +65,15 @@ class Drone:
         best_creature, *_ = min(creature_data, key=lambda x: x[2])
         return best_creature, distance
 
+    def play_turn(self) -> None:
+        creature, distance = self.best_creature_with_distance
+        x, y = creature.next_position
+        activate_light = int(
+            LIGHT_MAX_DISTANCE > distance > LIGHT_MIN_DISTANCE
+            and self.battery > LIGHT_BATTERY_COST
+        )
+        self.move(x, y, activate_light)
+
     def update_data(self, x: int, y: int, emergency: int, battery: int) -> None:
         self.x = x
         self.y = y
@@ -186,6 +195,13 @@ def update_game_state() -> None:
         radar = inputs[2]
 
 
+def play_turn() -> None:
+    update_game_state()
+    for drone_id in ME.ordered_drone_ids:
+        drone = ME.drones[drone_id]
+        drone.play_turn()
+
+
 LIGHT_MAX_DISTANCE = 2000
 LIGHT_MIN_DISTANCE = 800
 LIGHT_BATTERY_COST = 5
@@ -195,15 +211,5 @@ FOE = Player()
 CREATURE_COUNT = int(input())
 init_creatures(CREATURE_COUNT)
 
-# game loop
 while True:
-    update_game_state()
-    for drone_id in ME.ordered_drone_ids:
-        drone = ME.drones[drone_id]
-        creature, distance = drone.best_creature_with_distance
-        x, y = creature.next_position
-        activate_light = int(
-            LIGHT_MAX_DISTANCE > distance > LIGHT_MIN_DISTANCE
-            and drone.battery > LIGHT_BATTERY_COST
-        )
-        Drone.move(x, y, activate_light)
+    play_turn()
