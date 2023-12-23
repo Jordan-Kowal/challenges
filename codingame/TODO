@@ -1,14 +1,16 @@
 # TODO
 
-**If foe has scanned ID last round, we can estimate the creature position**
-- Estimate distance if light was used (battery has been used)
-- Check manually if creature move a lot, if not, set an average x range
-- Do not reset the position of those creatures
-- `last_turn_light` and `last_turn_scans`
-- Keep grid of fish
-- update grid based on movement estimate
-- if radar changes, narrow grid
+**Turn processing:**
+- ~~`last_turn_light` and `last_turn_scans`~~
+- ~~Store radar last_turn~~
+- ~~Check manually if creature move a lot, if not, set an average x range~~
 
+**Position estimate:**
+- ~~Do not reset the position of those creatures~~
+- ~~Keep grid of fish~~
+- If scanned by foe (last turn), narrow the grid (based on light)
+- Using radar and previous radar, narrow down the grid
+- Maybe extend the grid for scanned fish
 
 **Action:**
 - Guess what the foe will do next round
