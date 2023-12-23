@@ -2,7 +2,10 @@
 
 **If foe has scanned ID last round, we can estimate the creature position**
 - Estimate distance if light was used (battery has been used)
+- Check manually if creature move a lot, if not, set an average x range
 - Do not reset the position of those creatures
+- `last_turn_light` and `last_turn_scans`
+
 
 **Action:**
 - Guess what the foe will do next round
@@ -13,3 +16,4 @@
 - Action: Back to base with specific trajectory
 - Allow scanning if something is very close
 - Attr `is going home` to reset once no more scan
+- Factor in "could be picked up on the way up" if not to far x-wise
