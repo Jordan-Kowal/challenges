@@ -5,6 +5,9 @@
 - Check manually if creature move a lot, if not, set an average x range
 - Do not reset the position of those creatures
 - `last_turn_light` and `last_turn_scans`
+- Keep grid of fish
+- update grid based on movement estimate
+- if radar changes, narrow grid
 
 
 **Action:**
@@ -19,3 +22,5 @@
 - Factor in "could be picked up on the way up" if not to far x-wise
 - don't go toward fish if within 800 (or 2000 with light) but go to next instead
 - get 2 best fish and move towards 2nd within 800m of 1st
+
+- if foe returning? can I return before him? should I try to beat him?
