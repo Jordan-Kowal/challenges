@@ -1,0 +1,13 @@
+# If foe has scanned ID last round, we can estimate the creature position
+#   Estimate distance if light was used (battery has been used)
+#   Do not reset the position of those creatures
+
+# Action:
+#   Guess what the foe will do next round
+#   Figure out when to back and when to continue
+#   Update scoring mechanism for fish
+#   Update scoring for action pick
+#   Action: Back to base
+#   Action: Back to base with specific trajectory
+#   Allow scanning if something is very close
+#   Attr `is going home` to reset once no more scan

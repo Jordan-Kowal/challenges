@@ -2,6 +2,9 @@
 import sys
 from typing import Dict, List, Set, Tuple
 
+# --------------------------------------------------
+# Constants
+# --------------------------------------------------
 LIGHT_MAX_DISTANCE = 2_000
 LIGHT_MIN_DISTANCE = 800
 LIGHT_BATTERY_COST = 5
@@ -21,17 +24,23 @@ class RadarPosition:
     BOTTOM_RIGHT = "BR"
 
 
+# --------------------------------------------------
+# Classes
+# --------------------------------------------------
 class Player:
-    def __init__(self) -> None:
+    def __init__(self, is_me: bool) -> None:
+        self.is_me = is_me
         self.score: int = 0
         self.save_count: int = 0
         self.saved_creature_ids: Set[int] = set()
         self.drones: Dict[int, Drone] = {}
         self.ordered_drone_ids: List[int] = []
 
-    @property
-    def drone_count(self) -> int:
-        return len(self.drones)
+    def __str__(self) -> str:
+        return "Me" if self.is_me else "Foe"
+
+    def __repr__(self) -> str:
+        return str(self)
 
     @property
     def saved_creatures(self) -> Set["Creature"]:
@@ -44,7 +53,7 @@ class Player:
         self.save_count = int(input())
         self.saved_creature_ids = {int(input()) for _ in range(self.save_count)}
 
-    def update_drones_from_input(self) -> None:
+    def update_drones_vitals_from_input(self) -> None:
         my_drone_count = int(input())
         order = []
         for _ in range(my_drone_count):
@@ -57,11 +66,7 @@ class Player:
 
 
 class Drone:
-    def __init__(
-        self,
-        player: Player,
-        _id: int,
-    ) -> None:
+    def __init__(self, player: Player, _id: int) -> None:
         self.player = player
         self.id = _id
         self.x: int = 0
@@ -69,6 +74,12 @@ class Drone:
         self.emergency: int = 0
         self.battery: int = 0
         self.scanned_creature_ids: Set[int] = set()
+
+    def __str__(self) -> str:
+        return f"Drone {self.id} ({self.position}) for {self.player}"
+
+    def __repr__(self) -> str:
+        return str(self)
 
     @property
     def position(self) -> Tuple[int, int]:
@@ -194,20 +205,16 @@ class Creature:
         score *= 0.9**similar_color_scanned
         return distance, score
 
-    def update_data(self, x: int, y: int, vx: int, vy: int) -> None:
-        debug(f"Creature {self.id} is at {x}, {y} with speed {vx}, {vy}")
+    def update_position_data(self, x: int, y: int, vx: int, vy: int) -> None:
         self.x = x
         self.y = y
         self.vx = vx
         self.vy = vy
 
 
-def compute_distance(pos1: Tuple[int, int], pos2: Tuple[int, int]) -> int:
-    x1, y1 = pos1
-    x2, y2 = pos2
-    return int(((x1 - x2) ** 2 + (y1 - y2) ** 2) ** 0.5)
-
-
+# --------------------------------------------------
+# Utils
+# --------------------------------------------------
 def init_creatures(qty: int) -> None:
     for _ in range(qty):
         creature_id, color, _type = [int(j) for j in input().split()]
@@ -221,15 +228,15 @@ def update_creatures_from_input() -> None:
     for _ in range(visible_creature_count):
         creature_id, *data = [int(j) for j in input().split()]
         creature = CREATURES_BY_ID.get(creature_id)
-        creature.update_data(*data)
+        creature.update_position_data(*data)
         visible_ids.add(creature_id)
     # If creature not in, reset coordinates
     for creature_id, creature in CREATURES_BY_ID.items():
         if creature_id not in visible_ids:
-            creature.update_data(0, 0, 0, 0)
+            creature.update_position_data(0, 0, 0, 0)
 
 
-def update_my_drones_from_input() -> None:
+def update_drone_scans_from_input() -> None:
     drone_scan_count = int(input())
     scans_by_drone_id = {}
     for _ in range(drone_scan_count):
@@ -253,6 +260,12 @@ def compute_creatures_positions_from_input() -> None:
         creature.compute_position_from_radar(data)
 
 
+def compute_distance(pos1: Tuple[int, int], pos2: Tuple[int, int]) -> int:
+    x1, y1 = pos1
+    x2, y2 = pos2
+    return int(((x1 - x2) ** 2 + (y1 - y2) ** 2) ** 0.5)
+
+
 def debug(message) -> None:
     print(message, file=sys.stderr, flush=True)
 
@@ -264,9 +277,9 @@ def play_turn() -> None:
     ME.update_save_count_from_input()
     FOE.update_save_count_from_input()
     # Drones
-    ME.update_drones_from_input()
-    FOE.update_drones_from_input()
-    update_my_drones_from_input()
+    ME.update_drones_vitals_from_input()
+    FOE.update_drones_vitals_from_input()
+    update_drone_scans_from_input()
     # Creatures
     update_creatures_from_input()
     compute_creatures_positions_from_input()
@@ -276,10 +289,13 @@ def play_turn() -> None:
         drone.play_turn()
 
 
-DRONES_BY_ID = {}
-CREATURES_BY_ID = {}
-ME = Player()
-FOE = Player()
+# --------------------------------------------------
+# Game
+# --------------------------------------------------
+DRONES_BY_ID: Dict[int, Drone] = {}
+CREATURES_BY_ID: Dict[int, Creature] = {}
+ME = Player(is_me=True)
+FOE = Player(is_me=False)
 CREATURE_COUNT = int(input())
 init_creatures(CREATURE_COUNT)
 
