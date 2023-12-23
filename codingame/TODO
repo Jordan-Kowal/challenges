@@ -18,3 +18,4 @@
 - Attr `is going home` to reset once no more scan
 - Factor in "could be picked up on the way up" if not to far x-wise
 - don't go toward fish if within 800 (or 2000 with light) but go to next instead
+- get 2 best fish and move towards 2nd within 800m of 1st
