@@ -8,21 +8,23 @@
 **Position estimate:**
 - ~~Do not reset the position of those creatures~~
 - ~~Keep grid of fish~~
-- If scanned by foe (last turn), narrow the grid (based on light)
-- Using radar and previous radar, narrow down the grid
-- Maybe extend the grid for scanned fish
+- ~~Extend the grid each turn but within limits~~
+- ~~If scanned by foe (last turn), narrow the grid (based on light)~~
+- ~~Using radar to narrow down the grid~~
+- ~~Narrow down the grid if radar has changed~~
 
 **Action:**
-- Guess what the foe will do next round
-- Figure out when to back and when to continue
 - Update scoring mechanism for fish
-- Update scoring for action pick
-- Action: Back to base
-- Action: Back to base with specific trajectory
-- Allow scanning if something is very close
-- Attr `is going home` to reset once no more scan
-- Factor in "could be picked up on the way up" if not to far x-wise
-- don't go toward fish if within 800 (or 2000 with light) but go to next instead
-- get 2 best fish and move towards 2nd within 800m of 1st
-
-- if foe returning? can I return before him? should I try to beat him?
+- Add logic for action choice
+- Enemy:
+  - Guess what the foe will do next round
+  - Guess if he is going back to base. Can I return before him? should I try to beat him?
+- Move:
+  - When multiple drone, go diagonally to 3000 and 7000 at start
+  - Get best 2-3 ships and compute best trajectory
+  - Activate light if multiple potentially within 2000
+- Save:
+  - Figure out when to back and when to continue
+  - Go straight up
+  - Go back and diagonally
+  - Maybe scan if something really close

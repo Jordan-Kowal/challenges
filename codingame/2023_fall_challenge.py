@@ -1,6 +1,12 @@
 # Built-in
 import sys
-from typing import Dict, List, Set, Tuple
+from typing import Dict, List, Optional, Set, Tuple
+
+# --------------------------------------------------
+# Types
+# --------------------------------------------------
+Area = Tuple[int, int, int, int]
+Position = Tuple[int, int]
 
 # --------------------------------------------------
 # Constants
@@ -15,13 +21,6 @@ DEPTHS_BY_TYPE: Dict[int, Tuple[int, int]] = {
     2: (7_500, 1_0000),
 }
 GRID_WIDTH = 10_000
-
-
-class RadarPosition:
-    TOP_LEFT = "TL"
-    TOP_RIGHT = "TR"
-    BOTTOM_LEFT = "BL"
-    BOTTOM_RIGHT = "BR"
 
 
 # --------------------------------------------------
@@ -45,6 +44,17 @@ class Player:
     @property
     def saved_creatures(self) -> Set["Creature"]:
         return {CREATURES_BY_ID[i] for i in self.saved_creature_ids}
+
+    @property
+    def scanned_or_saved_creature_ids(self) -> Set[int]:
+        ids = self.saved_creature_ids
+        for drone in self.drones.values():
+            ids |= drone.scanned_creature_ids
+        return ids
+
+    @property
+    def scanned_or_saved_creatures(self) -> Set["Creature"]:
+        return {CREATURES_BY_ID[i] for i in self.scanned_or_saved_creature_ids}
 
     def update_score_from_input(self) -> None:
         self.score = int(input())
@@ -86,6 +96,14 @@ class Drone:
     @property
     def position(self) -> Tuple[int, int]:
         return self.x, self.y
+
+    @property
+    def visible_area(self) -> Area:
+        amount = int(LIGHT_MIN_DISTANCE * LIGHT_SQUARE_RATIO)
+        if self.last_turn_light:
+            amount = int(LIGHT_MAX_DISTANCE * LIGHT_SQUARE_RATIO)
+        area = self.x, self.y, self.x, self.y
+        return increase_area(area, amount)
 
     @property
     def best_creature_with_distance(self) -> Tuple["Creature", int]:
@@ -131,9 +149,6 @@ class Drone:
     def wait(light: int) -> None:
         print(f"WAIT {light}")
 
-    # Action: Back to base but maybe take a creature on the way
-    # Action: Back to base directly
-
 
 class Creature:
     def __init__(self, _id: int, color: int, _type: int) -> None:
@@ -174,6 +189,23 @@ class Creature:
         return self.x + self.vx, self.y + self.vy
 
     @property
+    def max_area(self) -> Area:
+        return self.width_min, self.depth_min, self.width_max, self.depth_max
+
+    @property
+    def area(self) -> Area:
+        return self.x_min, self.y_min, self.x_max, self.y_max
+
+    @property
+    def radar_info_has_changed(self) -> bool:
+        if not self.last_turn_radar_info:
+            return False
+        for drone_id, radar in self.radar_info.items():
+            if radar != self.last_turn_radar_info.get(drone_id):
+                return True
+        return False
+
+    @property
     def foe_drones_that_scanned_it_last_turn(self) -> List[Drone]:
         return [
             drone
@@ -184,26 +216,49 @@ class Creature:
     def compute_position_for_turn(self) -> None:
         if self.is_visible:
             return
-        x_min = 0
-        x_max = GRID_WIDTH
-        y_min = self.depth_min
-        y_max = self.depth_max
+        # Update width range based on radar info
         for drone_id, radar in self.radar_info.items():
             drone = ME.drones[drone_id]
-            if radar == RadarPosition.TOP_LEFT:
-                x_max = min(x_max, drone.x)
-                y_max = min(y_max, drone.y)
-            elif radar == RadarPosition.TOP_RIGHT:
-                x_min = max(x_min, drone.x)
-                y_max = min(y_max, drone.y)
-            elif radar == RadarPosition.BOTTOM_LEFT:
-                x_max = min(x_max, drone.x)
-                y_min = max(y_min, drone.y)
-            elif radar == RadarPosition.BOTTOM_RIGHT:
-                x_min = max(x_min, drone.x)
-                y_min = max(y_min, drone.y)
-        self.x = (x_min + x_max) // 2
-        self.y = (y_min + y_max) // 2
+            if "L" in radar and drone.x < GRID_WIDTH // 2:
+                self.width_min, self.width_max = 0, GRID_WIDTH // 2
+            elif "R" in radar and drone.x >= GRID_WIDTH // 2:
+                self.width_min, self.width_max = GRID_WIDTH // 2, GRID_WIDTH
+        # Compute area from previous but within bounds
+        area = increase_area(self.area, CREATURE_MOVE_SPEED)
+        area = compute_area_overlap(area, self.max_area)
+        # If scanned last turn, narrow area
+        for drone in self.foe_drones_that_scanned_it_last_turn:
+            area = compute_area_overlap(drone.visible_area, area)
+        # Use radar info to narrow area
+        for drone_id, radar in self.radar_info.items():
+            drone = ME.drones[drone_id]
+            areas = {
+                "TL": (self.width_min, self.depth_min, drone.x, drone.y),
+                "TR": (drone.x, self.depth_min, self.width_max, drone.y),
+                "BL": (self.width_min, drone.y, drone.x, self.depth_max),
+                "BR": (drone.x, drone.y, self.width_max, self.depth_max),
+            }
+            area = compute_area_overlap(areas[radar], area)
+        # Narrow further if radar info has changed
+        if self.radar_info_has_changed:
+            for drone_id, radar in self.radar_info.items():
+                drone = ME.drones[drone_id]
+                old_radar = self.last_turn_radar_info.get(drone_id)
+                x_min, y_min, x_max, y_max = area
+                if "L" in old_radar and "R" in radar:
+                    x_min, x_max = drone.x, drone.x + CREATURE_MOVE_SPEED
+                if "R" in old_radar and "L" in radar:
+                    x_min, x_max = drone.x - CREATURE_MOVE_SPEED, drone.x
+                if "B" in old_radar and "T" in radar:
+                    y_min, y_max = drone.y, drone.y + CREATURE_MOVE_SPEED
+                if "T" in old_radar and "B" in radar:
+                    y_min, y_max = drone.y - CREATURE_MOVE_SPEED, drone.y
+                new_area = x_min, y_min, x_max, y_max
+                area = compute_area_overlap(new_area, area)
+        # Update coordinates
+        self.x_min, self.y_min, self.x_max, self.y_max = area
+        self.x = (self.x_min + self.x_max) // 2
+        self.y = (self.y_min + self.y_max) // 2
 
     def compute_score_for_drone(self, drone: Drone) -> Tuple[int, float]:
         # TODO:
@@ -304,10 +359,25 @@ def update_creatures_radar_data_from_input() -> None:
         creature.update_radar_info(data)
 
 
-def compute_distance(pos1: Tuple[int, int], pos2: Tuple[int, int]) -> int:
+def compute_distance(pos1: Position, pos2: Position) -> int:
     x1, y1 = pos1
     x2, y2 = pos2
     return int(((x1 - x2) ** 2 + (y1 - y2) ** 2) ** 0.5)
+
+
+def compute_area_overlap(area1: Area, area2: Area) -> Area:
+    x1_min, y1_min, x1_max, y1_max = area1
+    x2_min, y2_min, x2_max, y2_max = area2
+    x_min = max(x1_min, x2_min)
+    y_min = max(y1_min, y2_min)
+    x_max = min(x1_max, x2_max)
+    y_max = min(y1_max, y2_max)
+    return x_min, y_min, x_max, y_max
+
+
+def increase_area(area: Area, value: int) -> Area:
+    x_min, y_min, x_max, y_max = area
+    return x_min - value, y_min - value, x_max + value, y_max + value
 
 
 def debug(message) -> None:
@@ -338,8 +408,8 @@ def play_turn() -> None:
 # --------------------------------------------------
 # Assumptions
 # --------------------------------------------------
-CREATURE_MOVE_SPEED_X = 150
-CREATURE_MOVE_SPEED_Y = 150
+CREATURE_MOVE_SPEED = 200
+LIGHT_SQUARE_RATIO = 0.8
 
 
 # --------------------------------------------------
