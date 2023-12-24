@@ -46,15 +46,27 @@ class Player:
         return {CREATURES_BY_ID[i] for i in self.saved_creature_ids}
 
     @property
-    def scanned_or_saved_creature_ids(self) -> Set[int]:
-        ids = self.saved_creature_ids
+    def scanned_creature_ids(self) -> Set[int]:
+        ids = set()
         for drone in self.drones.values():
             ids |= drone.scanned_creature_ids
         return ids
 
     @property
+    def scanned_creatures(self) -> Set["Creature"]:
+        return {CREATURES_BY_ID[i] for i in self.scanned_creature_ids}
+
+    @property
+    def scanned_or_saved_creature_ids(self) -> Set[int]:
+        return self.scanned_creature_ids | self.saved_creature_ids
+
+    @property
     def scanned_or_saved_creatures(self) -> Set["Creature"]:
-        return {CREATURES_BY_ID[i] for i in self.scanned_or_saved_creature_ids}
+        return self.scanned_creatures | self.saved_creatures
+
+    @property
+    def creature_ids_to_scan(self) -> Set[int]:
+        return set(CREATURES_BY_ID.keys()) - self.scanned_or_saved_creature_ids
 
     def update_score_from_input(self) -> None:
         self.score = int(input())
@@ -106,25 +118,28 @@ class Drone:
         return increase_area(area, amount)
 
     @property
-    def best_creature_with_distance(self) -> Tuple["Creature", int]:
-        creature_data: List[Tuple[Creature, int, float]] = []
+    def best_creatures(self) -> List["Creature"]:
+        creature_data: List[Tuple[Creature, float]] = []
         for creature in CREATURES_BY_ID.values():
-            distance, score = creature.compute_score_for_drone(self)
-            creature_data.append((creature, distance, score))
-        creature_data.sort(key=lambda x: x[2])
-        for creature, distance, score in creature_data:
+            score = creature.compute_score_for_drone(self)
+            creature_data.append((creature, score))
+        creature_data.sort(key=lambda x: x[1], reverse=True)
+        for creature, score in creature_data:
+            distance = DRONE_CREATURE_DISTANCE[(self.id, creature.id)]
             debug(f"{creature} has score {score} and distance {distance}")
-        best_creature, distance, _ = creature_data[-1]
-        return best_creature, distance
+        return [creature for creature, _ in creature_data]
 
     def play_turn(self) -> None:
-        creature, distance = self.best_creature_with_distance
+        if len(self.player.creature_ids_to_scan) == 0:
+            return self.move(self.x, 500, 0)
+        creature = self.best_creatures[0]
+        distance = DRONE_CREATURE_DISTANCE[(self.id, creature.id)]
         x, y = creature.next_position
         activate_light = int(
             LIGHT_MAX_DISTANCE > distance > LIGHT_MIN_DISTANCE
             and self.battery > LIGHT_BATTERY_COST
         )
-        self.move(x, y, activate_light)
+        return self.move(x, y, activate_light)
 
     def update_vitals(self, x: int, y: int, emergency: int, battery: int) -> None:
         self.x = x
@@ -264,26 +279,26 @@ class Creature:
         self.vx = 0
         self.vy = 0
 
-    def compute_score_for_drone(self, drone: Drone) -> Tuple[int, float]:
+    def compute_score_for_drone(self, drone: Drone) -> float:
         player = drone.player
         foe = FOE if drone.player is ME else ME
         creatures_to_ignore = player.scanned_or_saved_creatures
         # Skip if already scanned/saved
         if self.id in player.scanned_or_saved_creature_ids:
-            return 0, 0
+            return 0
         # Compute score of creature
         distance = DRONE_CREATURE_DISTANCE[(drone.id, self.id)]
-        score = 1 / distance
+        score = 1_000 / distance
         # Lower score based on points
         value = self.value if self.id in foe.saved_creature_ids else self.value * 2
-        score *= 1.2**value
+        score *= 1.3**value
         # Improve score the more similar creatures are scanned (type)
         same_type_scanned = [c for c in creatures_to_ignore if c.type == self.type]
         score *= 1.1 ** len(same_type_scanned)
         # Improve score the more similar creatures are scanned (color)
         same_color_scanned = [c for c in creatures_to_ignore if c.color == self.color]
         score *= 1.1 ** len(same_color_scanned)
-        return distance, score
+        return score
 
     def update_visible_position(self, x: int, y: int, vx: int, vy: int) -> None:
         self.is_visible = True
