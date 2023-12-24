@@ -131,15 +131,8 @@ class Drone:
 
     def play_turn(self) -> None:
         if len(self.player.creature_ids_to_scan) == 0:
-            return self.move(self.x, 500, 0)
-        creature = self.best_creatures[0]
-        distance = DRONE_CREATURE_DISTANCE[(self.id, creature.id)]
-        x, y = creature.next_position
-        activate_light = int(
-            LIGHT_MAX_DISTANCE > distance > LIGHT_MIN_DISTANCE
-            and self.battery > LIGHT_BATTERY_COST
-        )
-        return self.move(x, y, activate_light)
+            return self.go_straight_up()
+        self.move_to_best_creature()
 
     def update_vitals(self, x: int, y: int, emergency: int, battery: int) -> None:
         self.x = x
@@ -158,13 +151,21 @@ class Drone:
             self.last_turn_scanned_creature_ids = set()
         self.scanned_creature_ids = scanned_ids
 
-    @staticmethod
-    def move(x: int, y: int, light: int) -> None:
-        print(f"MOVE {x} {y} {light}")
+    def move_to_best_creature(self) -> None:
+        c1, c2, c3 = self.best_creatures[:3]
+        x, y = c1.next_position
+        # Maybe activate light
+        d1, d2, d3 = [DRONE_CREATURE_DISTANCE[(self.id, c.id)] for c in [c1, c2, c3]]
+        light = any([LIGHT_MIN_DISTANCE < d < LIGHT_MAX_DISTANCE for d in [d1, d2, d3]])
+        # Move
+        print(f"MOVE {x} {y} {int(light)}")
 
     @staticmethod
     def wait(light: int) -> None:
         print(f"WAIT {light}")
+
+    def go_straight_up(self) -> None:
+        print(f"MOVE {self.x} {500} 0")
 
 
 class Creature:

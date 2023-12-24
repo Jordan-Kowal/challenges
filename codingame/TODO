@@ -16,7 +16,7 @@
 **Action:**
 - ~~Update scoring mechanism for fish~~
 - ~~Update weights for scoring mechanism~~
-- Add logic for action choice
+- ~~Add logic for action choice~~
 - Enemy:
   - Guess what the foe will do next round
   - Guess if he is going back to base. Can I return before him? should I try to beat him?
