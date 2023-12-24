@@ -1,4 +1,5 @@
 # Built-in
+import math
 import sys
 from typing import Dict, List, Optional, Set, Tuple
 
@@ -52,7 +53,7 @@ class Player:
 
     @property
     def saved_creatures(self) -> Set["Creature"]:
-        return {CREATURES_BY_ID[i] for i in self.saved_creature_ids}
+        return {FISHES_BY_IDS[i] for i in self.saved_creature_ids}
 
     @property
     def scanned_creature_ids(self) -> Set[int]:
@@ -63,7 +64,7 @@ class Player:
 
     @property
     def scanned_creatures(self) -> Set["Creature"]:
-        return {CREATURES_BY_ID[i] for i in self.scanned_creature_ids}
+        return {FISHES_BY_IDS[i] for i in self.scanned_creature_ids}
 
     @property
     def scanned_or_saved_creature_ids(self) -> Set[int]:
@@ -75,7 +76,7 @@ class Player:
 
     @property
     def creature_ids_to_scan(self) -> Set[int]:
-        return set(CREATURES_BY_ID.keys()) - self.scanned_or_saved_creature_ids
+        return set(FISHES_BY_IDS.keys()) - self.scanned_or_saved_creature_ids
 
     def update_score_from_input(self) -> None:
         self.score = int(input())
@@ -120,25 +121,25 @@ class Drone:
 
     @property
     def visible_area(self) -> Area:
-        amount = int(LIGHT_MIN_DISTANCE * LIGHT_SQUARE_RATIO)
-        if self.last_turn_light:
-            amount = int(LIGHT_MAX_DISTANCE * LIGHT_SQUARE_RATIO)
+        radius = LIGHT_MAX_DISTANCE if self.last_turn_light else LIGHT_MIN_DISTANCE
+        amount = int(math.sqrt(math.pi) * radius)
         area = self.x, self.y, self.x, self.y
         return increase_area(area, amount)
 
     @property
     def best_creatures(self) -> List["Creature"]:
         creature_data: List[Tuple[Creature, float]] = []
-        for creature in CREATURES_BY_ID.values():
+        for creature in FISHES_BY_IDS.values():
             score = creature.compute_score_for_drone(self)
             creature_data.append((creature, score))
         creature_data.sort(key=lambda x: x[1], reverse=True)
-        for creature, score in creature_data:
-            distance = DRONE_CREATURE_DISTANCE[(self.id, creature.id)]
-            debug(f"{creature} has score {score} and distance {distance}")
         return [creature for creature, _ in creature_data]
 
     def play_turn(self) -> None:
+        if TURN_COUNT < 4:
+            return self.move_to_initial_coordinates()
+        if self.emergency > 0:
+            return self.wait(0)
         if len(self.player.creature_ids_to_scan) == 0:
             return self.go_straight_up()
         self.move_to_best_creature()
@@ -169,6 +170,11 @@ class Drone:
         # Move
         print(f"MOVE {x} {y} {int(light)}")
 
+    def move_to_initial_coordinates(self) -> None:
+        x = GRID_WIDTH // 3 if self.x < GRID_WIDTH // 2 else GRID_WIDTH * 2 // 3
+        y = self.y + 2000
+        print(f"MOVE {x} {y} 0")
+
     @staticmethod
     def wait(light: int) -> None:
         print(f"WAIT {light}")
@@ -184,6 +190,7 @@ class Creature:
         self.color = color
         self.type = _type
         self.value: int = VALUE_BY_TYPE[_type]
+        self.is_monster = _type == -1
         # Available area
         self.width_min, self.width_max = 0, GRID_WIDTH
         self.depth_min, self.depth_max = DEPTHS_BY_TYPE[_type]
@@ -192,6 +199,7 @@ class Creature:
         self.y: int = 0
         self.vx: int = 0
         self.vy: int = 0
+        self.is_gone: bool = False
         self.is_visible: bool = False
         self.last_visible_turn: Optional[int] = None
         # Grid
@@ -241,7 +249,7 @@ class Creature:
         ]
 
     def compute_position_for_turn(self) -> None:
-        if self.is_visible:
+        if self.is_visible or self.is_gone:
             return
         # Update width range based on radar info
         for drone_id, radar in self.radar_info.items():
@@ -290,16 +298,20 @@ class Creature:
         self.vy = 0
 
     def compute_score_for_drone(self, drone: Drone) -> float:
+        # Skip if missing or already scanned/saved or monster
         player = drone.player
-        foe = FOE if drone.player is ME else ME
-        creatures_to_ignore = player.scanned_or_saved_creatures
-        # Skip if already scanned/saved
-        if self.id in player.scanned_or_saved_creature_ids:
+        if (
+            self.is_gone
+            or self.id in player.scanned_or_saved_creature_ids
+            or self.is_monster
+        ):
             return 0
         # Compute score of creature
         distance = DRONE_CREATURE_DISTANCE[(drone.id, self.id)]
         score = 1_000 / distance
         # Lower score based on points
+        foe = FOE if drone.player is ME else ME
+        creatures_to_ignore = player.scanned_or_saved_creatures
         value = self.value if self.id in foe.saved_creature_ids else self.value * 2
         score *= 1.3**value
         # Improve score the more similar creatures are scanned (type)
@@ -338,21 +350,24 @@ def init_creatures(qty: int) -> None:
     for _ in range(qty):
         creature_id, color, _type = [int(j) for j in input().split()]
         creature = Creature(creature_id, color, _type)
-        CREATURES_BY_ID[creature_id] = creature
-
+        ALL_CREATURES_BY_ID[creature_id] = creature
+        if _type == -1:
+            MONSTERS_BY_IDS[creature_id] = creature
+        else:
+            FISHES_BY_IDS[creature_id] = creature
 
 def update_creatures_visibility_from_input() -> None:
     visible_creature_count = int(input())
     visible_ids = set()
     for _ in range(visible_creature_count):
         creature_id, *data = [int(j) for j in input().split()]
-        creature = CREATURES_BY_ID.get(creature_id)
+        creature = ALL_CREATURES_BY_ID.get(creature_id)
         creature.update_visible_position(*data)
         visible_ids.add(creature_id)
     # Update visibility for creatures not visible
-    missing_ids = set(CREATURES_BY_ID.keys()) - visible_ids
+    missing_ids = set(ALL_CREATURES_BY_ID.keys()) - visible_ids
     for creature_id in missing_ids:
-        CREATURES_BY_ID[creature_id].is_visible = False
+        ALL_CREATURES_BY_ID[creature_id].is_visible = False
 
 
 def update_drone_scans_from_input() -> None:
@@ -375,8 +390,12 @@ def update_creatures_radar_data_from_input() -> None:
         creature_id = int(inputs[1])
         radar = inputs[2]
         data_per_creature_id.setdefault(creature_id, {}).setdefault(drone_id, radar)
+    missing_ids = set(ALL_CREATURES_BY_ID.keys()) - set(data_per_creature_id.keys())
+    for creature_id in missing_ids:
+        creature = ALL_CREATURES_BY_ID[creature_id]
+        creature.is_gone = True
     for creature_id, data in data_per_creature_id.items():
-        creature = CREATURES_BY_ID[creature_id]
+        creature = ALL_CREATURES_BY_ID[creature_id]
         creature.update_radar_info(data)
 
 
@@ -421,7 +440,8 @@ def read_input() -> None:
 
 
 def play_turn() -> None:
-    for creature in CREATURES_BY_ID.values():
+    # Compute distance between drones and creatures
+    for creature in ALL_CREATURES_BY_ID.values():
         creature.compute_position_for_turn()
         for drone in DRONES_BY_ID.values():
             distance = compute_distance(drone.position, creature.next_position)
@@ -433,23 +453,22 @@ def play_turn() -> None:
 
 
 # --------------------------------------------------
-# Assumptions
-# --------------------------------------------------
-LIGHT_SQUARE_RATIO = 0.8
-
-
-# --------------------------------------------------
 # Game
 # --------------------------------------------------
-TURN_COUNT = 0
 DRONES_BY_ID: Dict[int, Drone] = {}
-CREATURES_BY_ID: Dict[int, Creature] = {}
+ALL_CREATURES_BY_ID: Dict[int, Creature] = {}
+FISHES_BY_IDS: Dict[int, Creature] = {}
+MONSTERS_BY_IDS: Dict[int, Creature] = {}
+MISSING_CREATURE_IDS: Set[int] = set()
 DRONE_CREATURE_DISTANCE: Dict[Tuple[int, int], int] = {}
+
 ME = Player(is_me=True)
 FOE = Player(is_me=False)
+
 CREATURE_COUNT = int(input())
 init_creatures(CREATURE_COUNT)
 
+TURN_COUNT = 0
 while True:
     TURN_COUNT += 1
     read_input()
