@@ -110,9 +110,11 @@ class Drone:
         creature_data: List[Tuple[Creature, int, float]] = []
         for creature in CREATURES_BY_ID.values():
             distance, score = creature.compute_score_for_drone(self)
-            debug(f"{creature} has score {score} and distance {distance}")
             creature_data.append((creature, distance, score))
-        best_creature, distance, _ = min(creature_data, key=lambda x: x[2])
+        creature_data.sort(key=lambda x: x[2])
+        for creature, distance, score in creature_data:
+            debug(f"{creature} has score {score} and distance {distance}")
+        best_creature, distance, _ = creature_data[-1]
         return best_creature, distance
 
     def play_turn(self) -> None:
@@ -259,34 +261,28 @@ class Creature:
         self.x_min, self.y_min, self.x_max, self.y_max = area
         self.x = (self.x_min + self.x_max) // 2
         self.y = (self.y_min + self.y_max) // 2
+        self.vx = 0
+        self.vy = 0
 
     def compute_score_for_drone(self, drone: Drone) -> Tuple[int, float]:
-        # TODO:
-        # value * 2 if not scanned by foe?
-        # is_visible?
-
         player = drone.player
-        other_player = FOE if drone.player is ME else ME
-        # Skip if already scanned
-        if self.id in drone.scanned_creature_ids:
-            return 1_000_000, 1_000_000
+        foe = FOE if drone.player is ME else ME
+        creatures_to_ignore = player.scanned_or_saved_creatures
+        # Skip if already scanned/saved
+        if self.id in player.scanned_or_saved_creature_ids:
+            return 0, 0
         # Compute score of creature
-        scanned_creatures = [CREATURES_BY_ID[i] for i in drone.scanned_creature_ids]
-        distance = compute_distance(drone.position, self.next_position)
-        score = distance
-        # Improve score if not scanned by foe
-        # if self.id not in other_player.scanned_creatures:
-        #     score *= 0.8
+        distance = DRONE_CREATURE_DISTANCE[(drone.id, self.id)]
+        score = 1 / distance
+        # Lower score based on points
+        value = self.value if self.id in foe.saved_creature_ids else self.value * 2
+        score *= 1.2**value
         # Improve score the more similar creatures are scanned (type)
-        similar_type_scanned = sum(
-            [int(sc.type == self.type) for sc in scanned_creatures]
-        )
-        score *= 0.9**similar_type_scanned
+        same_type_scanned = [c for c in creatures_to_ignore if c.type == self.type]
+        score *= 1.1 ** len(same_type_scanned)
         # Improve score the more similar creatures are scanned (color)
-        similar_color_scanned = sum(
-            [int(sc.color == self.color) for sc in scanned_creatures]
-        )
-        score *= 0.9**similar_color_scanned
+        same_color_scanned = [c for c in creatures_to_ignore if c.color == self.color]
+        score *= 1.1 ** len(same_color_scanned)
         return distance, score
 
     def update_visible_position(self, x: int, y: int, vx: int, vy: int) -> None:
@@ -384,7 +380,7 @@ def debug(message) -> None:
     print(message, file=sys.stderr, flush=True)
 
 
-def play_turn() -> None:
+def read_input() -> None:
     ME.update_score_from_input()
     FOE.update_score_from_input()
     # Scan
@@ -397,8 +393,14 @@ def play_turn() -> None:
     # Creatures
     update_creatures_visibility_from_input()
     update_creatures_radar_data_from_input()
+
+
+def play_turn() -> None:
     for creature in CREATURES_BY_ID.values():
         creature.compute_position_for_turn()
+        for drone in DRONES_BY_ID.values():
+            distance = compute_distance(drone.position, creature.next_position)
+            DRONE_CREATURE_DISTANCE[(drone.id, creature.id)] = distance
     # Play
     for drone_id in ME.ordered_drone_ids:
         drone = ME.drones[drone_id]
@@ -418,6 +420,7 @@ LIGHT_SQUARE_RATIO = 0.8
 TURN_COUNT = 0
 DRONES_BY_ID: Dict[int, Drone] = {}
 CREATURES_BY_ID: Dict[int, Creature] = {}
+DRONE_CREATURE_DISTANCE: Dict[Tuple[int, int], int] = {}
 ME = Player(is_me=True)
 FOE = Player(is_me=False)
 CREATURE_COUNT = int(input())
@@ -425,6 +428,7 @@ init_creatures(CREATURE_COUNT)
 
 while True:
     TURN_COUNT += 1
-    play_turn()
+    read_input()
     if TURN_COUNT == 1:
         DRONES_BY_ID = {**ME.drones, **FOE.drones}
+    play_turn()

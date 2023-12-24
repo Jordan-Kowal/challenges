@@ -14,7 +14,8 @@
 - ~~Narrow down the grid if radar has changed~~
 
 **Action:**
-- Update scoring mechanism for fish
+- ~~Update scoring mechanism for fish~~
+- ~~Update weights for scoring mechanism~~
 - Add logic for action choice
 - Enemy:
   - Guess what the foe will do next round
