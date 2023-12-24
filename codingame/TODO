@@ -12,11 +12,18 @@
 - ~~If scanned by foe (last turn), narrow the grid (based on light)~~
 - ~~Using radar to narrow down the grid~~
 - ~~Narrow down the grid if radar has changed~~
+- Creature within 1400u of moving ship will move in opposite direction.
+- Compute vx/vy if fleeing (ie within motor)
+- Track or compute if fish is out of X bounds (and can never go back in)
+  - Check if inputs change?
+- Update value of `Type/Color` computations if cannot be in the grid anymore
+
 
 **Action:**
 - ~~Update scoring mechanism for fish~~
 - ~~Update weights for scoring mechanism~~
 - ~~Add logic for action choice~~
+- Have 0 value for monster
 - Enemy:
   - Guess what the foe will do next round
   - Guess if he is going back to base. Can I return before him? should I try to beat him?
@@ -24,6 +31,9 @@
   - When multiple drone, go diagonally to 3000 and 7000 at start
   - Get best 2-3 ships and compute best trajectory
   - Activate light if multiple potentially within 2000
+  - Do not chase a missing fish
+  - Monster: No light if close monster
+  - Monster: Avoid monster and pick another target?
 - Save:
   - Figure out when to back and when to continue
   - Go straight up

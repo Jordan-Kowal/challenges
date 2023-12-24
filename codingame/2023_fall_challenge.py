@@ -14,11 +14,20 @@ Position = Tuple[int, int]
 LIGHT_MAX_DISTANCE = 2_000
 LIGHT_MIN_DISTANCE = 800
 LIGHT_BATTERY_COST = 5
-VALUE_BY_TYPE: Dict[int, int] = {0: 1, 1: 2, 2: 3}
+
+CREATURE_SPEED = 200
+CREATURE_FLEE_RANGE = 1_400
+
+MONSTER_PASSIVE_SPEED = 270
+MONSTER_AGGRO_SPEED = 540
+MONSTER_KILL_RANGE = 500
+
+VALUE_BY_TYPE: Dict[int, int] = {-1: 0, 0: 1, 1: 2, 2: 3}
 DEPTHS_BY_TYPE: Dict[int, Tuple[int, int]] = {
     0: (2_500, 5_000),
     1: (5_000, 7_500),
-    2: (7_500, 1_0000),
+    2: (7_500, 10_000),
+    -1: (2500, 10_000),
 }
 GRID_WIDTH = 10_000
 
@@ -242,7 +251,7 @@ class Creature:
             elif "R" in radar and drone.x >= GRID_WIDTH // 2:
                 self.width_min, self.width_max = GRID_WIDTH // 2, GRID_WIDTH
         # Compute area from previous but within bounds
-        area = increase_area(self.area, CREATURE_MOVE_SPEED)
+        area = increase_area(self.area, CREATURE_SPEED)
         area = compute_area_overlap(area, self.max_area)
         # If scanned last turn, narrow area
         for drone in self.foe_drones_that_scanned_it_last_turn:
@@ -264,13 +273,13 @@ class Creature:
                 old_radar = self.last_turn_radar_info.get(drone_id)
                 x_min, y_min, x_max, y_max = area
                 if "L" in old_radar and "R" in radar:
-                    x_min, x_max = drone.x, drone.x + CREATURE_MOVE_SPEED
+                    x_min, x_max = drone.x, drone.x + CREATURE_SPEED
                 if "R" in old_radar and "L" in radar:
-                    x_min, x_max = drone.x - CREATURE_MOVE_SPEED, drone.x
+                    x_min, x_max = drone.x - CREATURE_SPEED, drone.x
                 if "B" in old_radar and "T" in radar:
-                    y_min, y_max = drone.y, drone.y + CREATURE_MOVE_SPEED
+                    y_min, y_max = drone.y, drone.y + CREATURE_SPEED
                 if "T" in old_radar and "B" in radar:
-                    y_min, y_max = drone.y - CREATURE_MOVE_SPEED, drone.y
+                    y_min, y_max = drone.y - CREATURE_SPEED, drone.y
                 new_area = x_min, y_min, x_max, y_max
                 area = compute_area_overlap(new_area, area)
         # Update coordinates
@@ -426,7 +435,6 @@ def play_turn() -> None:
 # --------------------------------------------------
 # Assumptions
 # --------------------------------------------------
-CREATURE_MOVE_SPEED = 200
 LIGHT_SQUARE_RATIO = 0.8
 
 
