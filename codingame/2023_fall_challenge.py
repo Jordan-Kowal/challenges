@@ -451,7 +451,7 @@ def compute_colors_combo(creature_ids: Set[int]) -> Set[int]:
     return {k for k, v in counter.items() if v == 3}
 
 
-def compute_best_potential_score(
+def compute_new_score(
     current_score: int,
     saved_ids: Set[int],
     scanned_ids: Set[int],
@@ -484,21 +484,22 @@ def compute_best_potential_score(
 
 
 def check_if_returning_wins() -> bool:
-    all_fish_ids = set(FISHES_BY_IDS.keys())
-    my_score_after_save = compute_best_potential_score(
+    all_fishes = set(FISHES_BY_IDS.values())
+    available_fish_ids = {c.id for c in all_fishes if not c.is_gone}
+    my_score_after_save = compute_new_score(
         ME.score, ME.saved_creature_ids, ME.scanned_creature_ids, FOE.saved_creature_ids
     )
-    enemy_best_potential_score_after_my_save = compute_best_potential_score(
+    enemy_best_potential_score_after_my_save = compute_new_score(
         FOE.score,
         FOE.saved_creature_ids,
-        all_fish_ids,
+        available_fish_ids | FOE.scanned_creature_ids,
         ME.saved_creature_ids | ME.scanned_creature_ids,
     )
-    my_final_score = compute_best_potential_score(
+    my_final_score = compute_new_score(
         my_score_after_save,
         ME.saved_creature_ids | ME.scanned_creature_ids,
-        all_fish_ids,
-        all_fish_ids,
+        available_fish_ids,
+        available_fish_ids | FOE.saved_creature_ids,
     )
     return my_final_score > enemy_best_potential_score_after_my_save
 
