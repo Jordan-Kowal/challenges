@@ -21,6 +21,7 @@
 - ~~Compute if scoring now would make us win?~~
   - ~~Compute maximum score possible~~
   - ~~If I bring THIS back and he has everything, would I win?~~
+- Take into account missing fishes
 
 **Action:**
 - ~~Update scoring mechanism for fish~~
@@ -33,6 +34,8 @@
 - Move:
   - When multiple drone, go diagonally to 3000 and 7000 at start
   - Get best 2-3 creatures and compute best trajectory
+  - Make sure drones do not go to same target
+    - If 2 targets, better split
   - ~~Do not chase a missing fish~~
   - Monster: No light if close monster
   - Monster: Avoid monster and pick another target?
