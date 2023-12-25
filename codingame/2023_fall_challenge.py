@@ -16,6 +16,7 @@ Position = Tuple[int, int]
 LIGHT_MAX_DISTANCE = 2_000
 LIGHT_MIN_DISTANCE = 800
 LIGHT_BATTERY_COST = 5
+DRONE_SPEED = 600
 
 CREATURE_SPEED = 200
 CREATURE_FLEE_RANGE = 1_400
@@ -128,6 +129,22 @@ class Drone:
         return self.x, self.y
 
     @property
+    def is_being_chased(self) -> bool:
+        for monster in MONSTERS_BY_IDS.values():
+            if not monster.is_visible or not monster.is_aggro:
+                continue
+            is_closest = all(
+                [
+                    DRONE_CREATURE_DISTANCE[(self.id, monster.id)]
+                    <= DRONE_CREATURE_DISTANCE[(drone_id, monster.id)]
+                    for drone_id in DRONES_BY_ID.keys()
+                ]
+            )
+            if is_closest:
+                return True
+        return False
+
+    @property
     def visible_area(self) -> Area:
         radius = LIGHT_MAX_DISTANCE if self.last_turn_light else LIGHT_MIN_DISTANCE
         amount = int(math.sqrt(math.pi) * radius)
@@ -182,13 +199,12 @@ class Drone:
         # Maybe activate light
         d1, d2, d3 = [DRONE_CREATURE_DISTANCE[(self.id, c.id)] for c in [c1, c2, c3]]
         light = any([LIGHT_MIN_DISTANCE < d < LIGHT_MAX_DISTANCE for d in [d1, d2, d3]])
-        # Move
-        print(f"MOVE {x} {y} {int(light)}")
+        self.move(x, y, int(light))
 
     def move_to_initial_coordinates(self) -> None:
         x = GRID_WIDTH // 3 if self.x < GRID_WIDTH // 2 else GRID_WIDTH * 2 // 3
         y = self.y + 2000
-        print(f"MOVE {x} {y} 0")
+        self.move(x, y, 0)
 
     @staticmethod
     def wait(light: int) -> None:
@@ -196,7 +212,10 @@ class Drone:
 
     def go_straight_up(self) -> None:
         self.is_returning = True
-        print(f"MOVE {self.x} {500} 0")
+        self.move(self.x, 500, 0)
+
+    def move(self, x: int, y: int, light: int) -> None:
+        print(f"MOVE {x} {y} {light}")
 
 
 class Creature:
@@ -218,6 +237,7 @@ class Creature:
         self.is_gone: bool = False
         self.is_visible: bool = False
         self.last_visible_turn: Optional[int] = None
+        self.position_track: List[Position] = []
         # Grid
         self.x_min, self.x_max = 0, GRID_WIDTH
         self.y_min, self.y_max = DEPTHS_BY_TYPE[_type]
@@ -248,6 +268,13 @@ class Creature:
         return self.x_min, self.y_min, self.x_max, self.y_max
 
     @property
+    def is_aggro(self) -> bool:
+        return (
+            self.is_monster
+            and abs(self.vx) + abs(self.vy) > MONSTER_PASSIVE_SPEED * 1.5
+        )
+
+    @property
     def radar_info_has_changed(self) -> bool:
         if not self.last_turn_radar_info:
             return False
@@ -264,7 +291,16 @@ class Creature:
             if self.id in drone.last_turn_scanned_creature_ids
         ]
 
+    @property
+    def speed(self) -> int:
+        if not self.is_monster:
+            return CREATURE_SPEED
+        if self.is_aggro:
+            return MONSTER_AGGRO_SPEED
+        return MONSTER_PASSIVE_SPEED
+
     def compute_position_for_turn(self) -> None:
+        self.position_track = []
         if self.is_visible or self.is_gone:
             return
         # Update width range based on radar info
@@ -358,6 +394,19 @@ class Creature:
         self.last_turn_radar_info = self.radar_info
         self.radar_info = data
 
+    def compute_position_track_for_turn(self) -> None:
+        next_position = self.x + self.vx, self.y + self.vy
+        speed = self.speed
+        track: List[Position] = []
+        for i in range(TRAJECTORY_STEP_COUNT):
+            vx, vy = compute_vx_vy_from_positions(
+                self.position,
+                next_position,
+                int(speed * (i + 1) / TRAJECTORY_STEP_COUNT),
+            )
+            track.append((self.x + vx, self.y + vy))
+        self.position_track = track
+
 
 # --------------------------------------------------
 # Utils
@@ -378,6 +427,8 @@ def update_creatures_visibility_from_input() -> None:
     visible_ids = set()
     for _ in range(visible_creature_count):
         creature_id, *data = [int(j) for j in input().split()]
+        if creature_id == 16:
+            debug(f"Monster 16: {data}")
         creature = ALL_CREATURES_BY_ID.get(creature_id)
         creature.update_visible_position(*data)
         visible_ids.add(creature_id)
@@ -508,6 +559,21 @@ def debug(message) -> None:
     print(message, file=sys.stderr, flush=True)
 
 
+def compute_vx_vy_from_positions(
+    pos1: Position, pos2: Position, distance: int
+) -> Tuple[int, int]:
+    if pos1 == pos2:
+        return 0, 0
+    x1, y1 = pos1
+    x2, y2 = pos2
+    dx = x2 - x1
+    dy = y2 - y1
+    dh = (dx**2 + dy**2) ** 0.5
+    # TODO: Extract this for performance
+    ratio = math.ceil(dh / distance)
+    return dx / ratio, dy / ratio
+
+
 def read_input() -> None:
     ME.update_score_from_input()
     FOE.update_score_from_input()
@@ -530,6 +596,10 @@ def play_turn() -> None:
         for drone in DRONES_BY_ID.values():
             distance = compute_distance(drone.position, creature.next_position)
             DRONE_CREATURE_DISTANCE[(drone.id, creature.id)] = distance
+    # Compute monsters progress
+    for monster in MONSTERS_BY_IDS.values():
+        if monster.is_visible:
+            monster.compute_position_track_for_turn()
     # Saving now might make us win
     if check_if_returning_wins():
         for drone in ME.drones.values():
@@ -538,6 +608,12 @@ def play_turn() -> None:
     for drone_id in ME.ordered_drone_ids:
         drone = ME.drones[drone_id]
         drone.play_turn()
+
+
+# --------------------------------------------------
+# Params
+# --------------------------------------------------
+TRAJECTORY_STEP_COUNT = 10
 
 
 # --------------------------------------------------
