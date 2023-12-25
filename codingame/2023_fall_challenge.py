@@ -1,6 +1,7 @@
 # Built-in
 import math
 import sys
+from collections import Counter
 from typing import Dict, List, Optional, Set, Tuple
 
 # --------------------------------------------------
@@ -24,6 +25,8 @@ MONSTER_AGGRO_SPEED = 540
 MONSTER_KILL_RANGE = 500
 
 VALUE_BY_TYPE: Dict[int, int] = {-1: 0, 0: 1, 1: 2, 2: 3}
+COLOR_COMBO = 3
+TYPE_COMBO = 4
 DEPTHS_BY_TYPE: Dict[int, Tuple[int, int]] = {
     0: (2_500, 5_000),
     1: (5_000, 7_500),
@@ -50,6 +53,10 @@ class Player:
 
     def __repr__(self) -> str:
         return str(self)
+
+    @property
+    def foe(self) -> "Player":
+        return FOE if self.is_me else ME
 
     @property
     def saved_creatures(self) -> Set["Creature"]:
@@ -108,6 +115,7 @@ class Drone:
         self.scanned_creature_ids: Set[int] = set()
         self.last_turn_scanned_creature_ids: Set[int] = set()
         self.last_turn_light: bool = False
+        self.is_returning: bool = False
 
     def __str__(self) -> str:
         return f"Drone {self.id} ({self.position}) for {self.player}"
@@ -136,13 +144,20 @@ class Drone:
         return [creature for creature, _ in creature_data]
 
     def play_turn(self) -> None:
+        if self.is_returning and len(self.scanned_creature_ids) > 0:
+            return self.go_straight_up()
+        self.is_returning = False
+        if len(self.player.scanned_creature_ids) == 9:
+            return self.go_straight_up()
+        if WIN_IF_RETURN:
+            return self.go_straight_up()
         if TURN_COUNT < 4:
             return self.move_to_initial_coordinates()
         if self.emergency > 0:
             return self.wait(0)
         if len(self.player.creature_ids_to_scan) == 0:
             return self.go_straight_up()
-        self.move_to_best_creature()
+        return self.move_to_best_creature()
 
     def update_vitals(self, x: int, y: int, emergency: int, battery: int) -> None:
         self.x = x
@@ -180,6 +195,7 @@ class Drone:
         print(f"WAIT {light}")
 
     def go_straight_up(self) -> None:
+        self.is_returning = True
         print(f"MOVE {self.x} {500} 0")
 
 
@@ -356,6 +372,7 @@ def init_creatures(qty: int) -> None:
         else:
             FISHES_BY_IDS[creature_id] = creature
 
+
 def update_creatures_visibility_from_input() -> None:
     visible_creature_count = int(input())
     visible_ids = set()
@@ -379,6 +396,10 @@ def update_drone_scans_from_input() -> None:
     for drone_id, scans in scans_by_drone_id.items():
         drone = DRONES_BY_ID[drone_id]
         drone.update_scans(scans)
+    missing_drone_ids = set(DRONES_BY_ID.keys()) - set(scans_by_drone_id.keys())
+    for drone_id in missing_drone_ids:
+        drone = DRONES_BY_ID[drone_id]
+        drone.update_scans(set())
 
 
 def update_creatures_radar_data_from_input() -> None:
@@ -420,6 +441,68 @@ def increase_area(area: Area, value: int) -> Area:
     return x_min - value, y_min - value, x_max + value, y_max + value
 
 
+def compute_types_combo(creature_ids: Set[int]) -> Set[int]:
+    counter = Counter([ALL_CREATURES_BY_ID[i].type for i in creature_ids])
+    return {k for k, v in counter.items() if v == 4}
+
+
+def compute_colors_combo(creature_ids: Set[int]) -> Set[int]:
+    counter = Counter([ALL_CREATURES_BY_ID[i].color for i in creature_ids])
+    return {k for k, v in counter.items() if v == 3}
+
+
+def compute_best_potential_score(
+    current_score: int,
+    saved_ids: Set[int],
+    scanned_ids: Set[int],
+    foe_saved_ids: Set[int],
+) -> int:
+    score = current_score
+    # Compute new fishes
+    for id_ in scanned_ids:
+        if id_ in saved_ids:
+            continue
+        value = FISHES_BY_IDS[id_].value
+        score += value * 2 if id_ not in foe_saved_ids else value
+    # Compute new type combos
+    foe_current_types = compute_types_combo(foe_saved_ids)
+    my_current_types = compute_types_combo(saved_ids)
+    my_potential_types = compute_types_combo(scanned_ids)
+    my_new_types = my_potential_types - my_current_types
+    for type_ in my_new_types:
+        value = TYPE_COMBO * 2 if type_ not in foe_current_types else TYPE_COMBO
+        score += value
+    # Compute new color combos
+    foe_current_colors = compute_colors_combo(foe_saved_ids)
+    my_current_colors = compute_colors_combo(saved_ids)
+    my_potential_colors = compute_colors_combo(scanned_ids)
+    my_new_colors = my_potential_colors - my_current_colors
+    for color in my_new_colors:
+        value = COLOR_COMBO * 2 if color not in foe_current_colors else COLOR_COMBO
+        score += value
+    return score
+
+
+def check_if_returning_wins() -> bool:
+    all_fish_ids = set(FISHES_BY_IDS.keys())
+    my_score_after_save = compute_best_potential_score(
+        ME.score, ME.saved_creature_ids, ME.scanned_creature_ids, FOE.saved_creature_ids
+    )
+    enemy_best_potential_score_after_my_save = compute_best_potential_score(
+        FOE.score,
+        FOE.saved_creature_ids,
+        all_fish_ids,
+        ME.saved_creature_ids | ME.scanned_creature_ids,
+    )
+    my_final_score = compute_best_potential_score(
+        my_score_after_save,
+        ME.saved_creature_ids | ME.scanned_creature_ids,
+        all_fish_ids,
+        all_fish_ids,
+    )
+    return my_final_score > enemy_best_potential_score_after_my_save
+
+
 def debug(message) -> None:
     print(message, file=sys.stderr, flush=True)
 
@@ -446,6 +529,10 @@ def play_turn() -> None:
         for drone in DRONES_BY_ID.values():
             distance = compute_distance(drone.position, creature.next_position)
             DRONE_CREATURE_DISTANCE[(drone.id, creature.id)] = distance
+    # Saving now might make us win
+    if check_if_returning_wins():
+        for drone in ME.drones.values():
+            drone.is_returning = True
     # Play
     for drone_id in ME.ordered_drone_ids:
         drone = ME.drones[drone_id]
@@ -461,6 +548,7 @@ FISHES_BY_IDS: Dict[int, Creature] = {}
 MONSTERS_BY_IDS: Dict[int, Creature] = {}
 MISSING_CREATURE_IDS: Set[int] = set()
 DRONE_CREATURE_DISTANCE: Dict[Tuple[int, int], int] = {}
+WIN_IF_RETURN = False
 
 ME = Player(is_me=True)
 FOE = Player(is_me=False)
