@@ -15,7 +15,7 @@
 - Creature within 1400u of moving ship will move in opposite direction.
 - Compute vx/vy if fleeing (ie within motor)
 - ~~Track if fish is out of X bounds~~
-- Update value of `Type/Color` computations if cannot be in the grid anymore
+- ~~Update value of `Type/Color` computations if cannot be in the grid anymore~~
 
 **Score computation**
 - ~~Compute if scoring now would make us win?~~
@@ -37,6 +37,7 @@
   - Make sure drones do not go to same target
   - ~~Do not chase a missing fish~~
   - ~~Monster: Avoid monster~~
+  - ~~Do not move out of bounds~~
 - Save:
   - ~~Go straight up~~
   - ~~Maybe scan if something really close (ie add light)~~

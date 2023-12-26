@@ -35,6 +35,7 @@ DEPTHS_BY_TYPE: Dict[int, Tuple[int, int]] = {
     -1: (2500, 10_000),
 }
 GRID_WIDTH = 10_000
+GRID_HEIGHT = 10_000
 
 
 # --------------------------------------------------
@@ -223,45 +224,19 @@ class Drone:
         self.move(self.x, 500, light)
 
     def move(self, x: int, y: int, light: int) -> None:
-        monsters_are_close = any(
-            [
-                DRONE_CREATURE_DISTANCE[(self.id, monster_id)] < 1500
-                for monster_id in MONSTERS_BY_IDS.keys()
-            ]
-        )
+        initial_x, initial_y = x, y
         # Maybe check if trajectory is at risk
-        attempts = 0
+        attempts = 1
         deg = 30
-        while monsters_are_close:
-            trajectory = []
-            for i in range(TRAJECTORY_STEP_COUNT):
-                vx, vy = compute_vx_vy_from_positions(
-                    self.position,
-                    (x, y),
-                    int(DRONE_SPEED * (i + 1) / TRAJECTORY_STEP_COUNT),
-                )
-                trajectory.append((self.x + vx, self.y + vy))
-            if self.is_trajectory_is_safe(trajectory):
+        while attempts <= 12:
+            trajectory = compute_trajectory(self.position, (x, y), DRONE_SPEED)
+            if is_trajectory_is_safe(trajectory) and is_trajectory_valid(trajectory):
                 break
             # Update trajectory
             attempts += 1
             rotation = attempts // 2 if attempts % 2 != 0 else -attempts // 2
-            x, y = rotate_point_on_circle((self.x, self.y), (x, y), rotation * deg)
-            # Surrounded, let it die
-            if attempts > 12:
-                break
+            x, y = rotate_point_on_circle((self.x, self.y), (initial_x, initial_y), rotation * deg)
         print(f"MOVE {x} {y} {light}")
-
-    @staticmethod
-    def is_trajectory_is_safe(trajectory: List[Position]) -> bool:
-        for monster in MONSTERS_BY_IDS.values():
-            if not monster.is_visible:
-                continue
-            if check_if_positions_cross_within_distance(
-                trajectory, monster.trajectory, MONSTER_KILL_RANGE + 100
-            ):
-                return False
-        return True
 
 
 class Creature:
@@ -411,13 +386,13 @@ class Creature:
         foe = FOE if drone.player is ME else ME
         creatures_to_ignore = player.scanned_or_saved_creatures
         value = self.value if self.id in foe.saved_creature_ids else self.value * 2
-        score *= 1.3**value
+        score *= VALUE_FACTOR**value
         # Improve score the more similar creatures are scanned (type)
         same_type_scanned = [c for c in creatures_to_ignore if c.type == self.type]
-        score *= 1.1 ** len(same_type_scanned)
+        score *= SAME_TYPE_FACTOR ** len(same_type_scanned)
         # Improve score the more similar creatures are scanned (color)
         same_color_scanned = [c for c in creatures_to_ignore if c.color == self.color]
-        score *= 1.1 ** len(same_color_scanned)
+        score *= SAME_COLOR_FACTOR ** len(same_color_scanned)
         return score
 
     def update_visible_position(self, x: int, y: int, vx: int, vy: int) -> None:
@@ -443,19 +418,11 @@ class Creature:
     def compute_trajectory_for_turn(self) -> None:
         next_position = self.x + self.vx, self.y + self.vy
         speed = self.speed
-        track: List[Position] = []
-        for i in range(TRAJECTORY_STEP_COUNT):
-            vx, vy = compute_vx_vy_from_positions(
-                self.position,
-                next_position,
-                int(speed * (i + 1) / TRAJECTORY_STEP_COUNT),
-            )
-            track.append((self.x + vx, self.y + vy))
-        self.trajectory = track
+        self.trajectory = compute_trajectory(self.position, next_position, speed)
 
 
 # --------------------------------------------------
-# Utils
+# Process inputs
 # --------------------------------------------------
 def init_creatures(qty: int) -> None:
     for _ in range(qty):
@@ -515,6 +482,18 @@ def update_creatures_radar_data_from_input() -> None:
         creature.update_radar_info(data)
 
 
+# --------------------------------------------------
+# Positions and distances
+# --------------------------------------------------
+def check_if_positions_cross_within_distance(
+    trajectory1: List[Position], trajectory2: List[Position], distance: int
+) -> bool:
+    for pos1, pos2 in zip(trajectory1, trajectory2):
+        if compute_distance(pos1, pos2) < distance:
+            return True
+    return False
+
+
 def compute_distance(pos1: Position, pos2: Position) -> int:
     x1, y1 = pos1
     x2, y2 = pos2
@@ -536,6 +515,75 @@ def increase_area(area: Area, value: int) -> Area:
     return x_min - value, y_min - value, x_max + value, y_max + value
 
 
+def compute_trajectory(
+    starting_position: Position, target_position: Position, max_speed: int
+) -> List[Position]:
+    trajectory = []
+    x, y = starting_position
+    for i in range(TRAJECTORY_STEP_COUNT):
+        vx, vy = compute_vx_vy_from_positions(
+            starting_position,
+            target_position,
+            int(max_speed * (i + 1) / TRAJECTORY_STEP_COUNT),
+        )
+        trajectory.append((x + vx, y + vy))
+    return trajectory
+
+
+def is_trajectory_valid(trajectory: List[Position]) -> bool:
+    return all(
+        [0 <= pos[0] <= GRID_WIDTH and 0 <= pos[1] <= GRID_HEIGHT for pos in trajectory]
+    )
+
+
+def is_trajectory_is_safe(trajectory: List[Position]) -> bool:
+    for monster in MONSTERS_BY_IDS.values():
+        if check_if_positions_cross_within_distance(
+            trajectory, monster.trajectory, MONSTER_AVOID_RANGE
+        ):
+            return False
+    return True
+
+
+def compute_vx_vy_from_positions(
+    pos1: Position, pos2: Position, distance: int
+) -> Tuple[int, int]:
+    if pos1 == pos2:
+        return 0, 0
+    x1, y1 = pos1
+    x2, y2 = pos2
+    dx = x2 - x1
+    dy = y2 - y1
+    dh = (dx**2 + dy**2) ** 0.5
+    # TODO: Extract this for performance
+    ratio = dh / distance
+    return int(dx / ratio), int(dy / ratio)
+
+
+def rotate_point_on_circle(center: Position, point: Position, degrees: int) -> Position:
+    x, y = center
+    x2, y2 = point
+    # Convert the angle from degrees to radians
+    angle_rad = math.radians(degrees)
+    # Translate the point to the origin
+    x2_translated = x2 - x
+    y2_translated = y2 - y
+    # Perform the rotation
+    x2_rotated = x2_translated * math.cos(angle_rad) - y2_translated * math.sin(
+        angle_rad
+    )
+    y2_rotated = x2_translated * math.sin(angle_rad) + y2_translated * math.cos(
+        angle_rad
+    )
+    # Translate the point back
+    x2_new = x2_rotated + x
+    y2_new = y2_rotated + y
+    return int(x2_new), int(y2_new)
+
+
+# --------------------------------------------------
+# Score
+# --------------------------------------------------
 def compute_types_combo(creature_ids: Set[int]) -> Set[int]:
     counter = Counter([ALL_CREATURES_BY_ID[i].type for i in creature_ids])
     return {k for k, v in counter.items() if v == 4}
@@ -599,55 +647,16 @@ def check_if_returning_wins() -> bool:
     return my_final_score > enemy_best_potential_score_after_my_save
 
 
+# --------------------------------------------------
+# Utils
+# --------------------------------------------------
 def debug(message) -> None:
     print(message, file=sys.stderr, flush=True)
 
 
-def check_if_positions_cross_within_distance(
-    trajectory1: List[Position], trajectory2: List[Position], distance: int
-) -> bool:
-    for pos1, pos2 in zip(trajectory1, trajectory2):
-        if compute_distance(pos1, pos2) < distance:
-            return True
-    return False
-
-
-def compute_vx_vy_from_positions(
-    pos1: Position, pos2: Position, distance: int
-) -> Tuple[int, int]:
-    if pos1 == pos2:
-        return 0, 0
-    x1, y1 = pos1
-    x2, y2 = pos2
-    dx = x2 - x1
-    dy = y2 - y1
-    dh = (dx**2 + dy**2) ** 0.5
-    # TODO: Extract this for performance
-    ratio = dh / distance
-    return int(dx / ratio), int(dy / ratio)
-
-
-def rotate_point_on_circle(center: Position, point: Position, degrees: int) -> Position:
-    x, y = center
-    x2, y2 = point
-    # Convert the angle from degrees to radians
-    angle_rad = math.radians(degrees)
-    # Translate the point to the origin
-    x2_translated = x2 - x
-    y2_translated = y2 - y
-    # Perform the rotation
-    x2_rotated = x2_translated * math.cos(angle_rad) - y2_translated * math.sin(
-        angle_rad
-    )
-    y2_rotated = x2_translated * math.sin(angle_rad) + y2_translated * math.cos(
-        angle_rad
-    )
-    # Translate the point back
-    x2_new = x2_rotated + x
-    y2_new = y2_rotated + y
-    return int(x2_new), int(y2_new)
-
-
+# --------------------------------------------------
+# Turns
+# --------------------------------------------------
 def read_input() -> None:
     ME.update_score_from_input()
     FOE.update_score_from_input()
@@ -687,7 +696,11 @@ def play_turn() -> None:
 # --------------------------------------------------
 # Params
 # --------------------------------------------------
-TRAJECTORY_STEP_COUNT = 10
+TRAJECTORY_STEP_COUNT = 20
+VALUE_FACTOR = 1.5
+SAME_TYPE_FACTOR = 1.1
+SAME_COLOR_FACTOR = 1.1
+MONSTER_AVOID_RANGE = MONSTER_KILL_RANGE + 250
 
 
 # --------------------------------------------------
