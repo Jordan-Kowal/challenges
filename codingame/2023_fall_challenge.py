@@ -187,7 +187,6 @@ class Drone:
         )
 
     def play_turn(self) -> None:
-        # Keep returning
         if self.is_returning and self.has_scans:
             return self.go_straight_up()
         self.is_returning = False
@@ -201,7 +200,12 @@ class Drone:
             if self.has_scans:
                 return self.go_straight_up()
             return self.push_fish()
-        return self.move_to_best_creature()
+        best_creature = self.get_best_creature()
+        if best_creature is None:
+            if self.has_scans:
+                return self.go_straight_up()
+            return self.push_fish()
+        return self.move(*best_creature.next_position)
 
     def reset_turn(self) -> None:
         self.target_creature_id = None
@@ -210,7 +214,6 @@ class Drone:
         self.x = x
         self.y = y
         self.emergency = emergency
-        # Battery
         self.last_turn_light = self.battery > battery
         self.battery = battery
 
@@ -223,15 +226,21 @@ class Drone:
             self.last_turn_scanned_creature_ids = set()
         self.scanned_creature_ids = scanned_ids
 
-    def move_to_best_creature(self) -> None:
+    def get_best_creature(self) -> Optional["Creature"]:
         best_creatures = self.best_creatures
-        x, y = best_creatures[0].next_position
-        self.move(x, y)
+        creature = best_creatures[0]
+        # Target check
+        if self.other_drone.target_creature_id == creature.id:
+            if len(best_creatures) > 1:
+                creature = best_creatures[1]
+            else:
+                creature = None
+        # Move to target
+        self.target_creature_id = creature.id if creature else None
+        return creature
 
     def move_to_initial_coordinates(self) -> None:
-        x = INITIAL_X_LEFT_TARGET if self.x < GRID_WIDTH // 2 else INITIAL_X_RIGHT_TARGET
-        y = INITIAL_Y_TARGET
-        self.move(x, y)
+        self.move(self.x, INITIAL_Y_TARGET)
 
     def push_fish(self) -> None:
         foe = self.player.foe
@@ -740,16 +749,14 @@ VALUE_FACTOR = 1.5
 SAME_TYPE_FACTOR = 1
 SAME_COLOR_FACTOR = 1
 
-TRAJECTORY_STEP_COUNT = 20
-MONSTER_AVOID_RANGE = MONSTER_KILL_RANGE + 250
+TRAJECTORY_STEP_COUNT = 50
+MONSTER_AVOID_RANGE = MONSTER_KILL_RANGE
 
 LIGHT_TRIGGER_MIN_DISTANCE = LIGHT_MIN_DISTANCE + 200
 LIGHT_TRIGGER_MAX_DISTANCE = LIGHT_MAX_DISTANCE + 1000
 
 INITIAL_TARGET_TURN_COUNT = 10
 INITIAL_Y_TARGET = 7_500
-INITIAL_X_LEFT_TARGET = GRID_WIDTH // 4
-INITIAL_X_RIGHT_TARGET = GRID_WIDTH * 2 // 4
 
 
 # --------------------------------------------------
