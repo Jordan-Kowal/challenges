@@ -160,7 +160,7 @@ class Drone:
             score = creature.compute_score_for_drone(self)
             creature_data.append((creature, score))
         creature_data.sort(key=lambda x: x[1], reverse=True)
-        return [creature for creature, _ in creature_data]
+        return [creature for creature, score in creature_data if score > 0]
 
     def play_turn(self) -> None:
         if self.is_returning and len(self.scanned_creature_ids) > 0:
@@ -194,17 +194,22 @@ class Drone:
         self.scanned_creature_ids = scanned_ids
 
     def move_to_best_creature(self) -> None:
-        c1, c2, c3 = self.best_creatures[:3]
-        x, y = c1.next_position
-        # Maybe activate light
-        d1, d2, d3 = [DRONE_CREATURE_DISTANCE[(self.id, c.id)] for c in [c1, c2, c3]]
-        light = any([LIGHT_MIN_DISTANCE < d < LIGHT_MAX_DISTANCE for d in [d1, d2, d3]])
-        self.move(x, y, int(light))
+        best_creatures = self.best_creatures
+        x, y = best_creatures[0].next_position
+        light = any(
+            [
+                LIGHT_TRIGGER_MIN_DISTANCE
+                < DRONE_CREATURE_DISTANCE[(self.id, c.id)]
+                < LIGHT_TRIGGER_MAX_DISTANCE
+                for c in best_creatures
+            ]
+        )
+        self.move(x, y, light)
 
     def move_to_initial_coordinates(self) -> None:
         x = GRID_WIDTH // 3 if self.x < GRID_WIDTH // 2 else GRID_WIDTH * 2 // 3
         y = self.y + 2000
-        self.move(x, y, 0)
+        self.move(x, y, False)
 
     @staticmethod
     def wait(light: int) -> None:
@@ -212,31 +217,35 @@ class Drone:
 
     def go_straight_up(self) -> None:
         self.is_returning = True
-        fishes_within_range = [
-            fish_id
-            for fish_id in FISHES_BY_IDS.keys()
-            if LIGHT_MIN_DISTANCE
-            < DRONE_CREATURE_DISTANCE[(self.id, fish_id)]
-            < LIGHT_MAX_DISTANCE
-            and fish_id not in self.player.scanned_or_saved_creature_ids
-        ]
-        light = 1 if len(fishes_within_range) > 0 else 0
+        light = any(
+            [
+                LIGHT_TRIGGER_MIN_DISTANCE
+                < DRONE_CREATURE_DISTANCE[(self.id, fish_id)]
+                < LIGHT_TRIGGER_MAX_DISTANCE
+                and fish_id not in self.player.scanned_or_saved_creature_ids
+                for fish_id in FISHES_BY_IDS.keys()
+            ]
+        )
         self.move(self.x, 500, light)
 
-    def move(self, x: int, y: int, light: int) -> None:
+    def move(self, x: int, y: int, light: bool) -> None:
         initial_x, initial_y = x, y
         # Maybe check if trajectory is at risk
         attempts = 1
         deg = 30
         while attempts <= 12:
             trajectory = compute_trajectory(self.position, (x, y), DRONE_SPEED)
+            if self.id == 1:
+                debug(f"{trajectory[19][0]} {trajectory[19][1]} {light}")
             if is_trajectory_is_safe(trajectory) and is_trajectory_valid(trajectory):
                 break
             # Update trajectory
             attempts += 1
             rotation = attempts // 2 if attempts % 2 != 0 else -attempts // 2
-            x, y = rotate_point_on_circle((self.x, self.y), (initial_x, initial_y), rotation * deg)
-        print(f"MOVE {x} {y} {light}")
+            x, y = rotate_point_on_circle(
+                (self.x, self.y), (initial_x, initial_y), rotation * deg
+            )
+        print(f"MOVE {x} {y} {int(light)}")
 
 
 class Creature:
@@ -698,9 +707,11 @@ def play_turn() -> None:
 # --------------------------------------------------
 TRAJECTORY_STEP_COUNT = 20
 VALUE_FACTOR = 1.5
-SAME_TYPE_FACTOR = 1.1
-SAME_COLOR_FACTOR = 1.1
+SAME_TYPE_FACTOR = 1
+SAME_COLOR_FACTOR = 1
 MONSTER_AVOID_RANGE = MONSTER_KILL_RANGE + 250
+LIGHT_TRIGGER_MIN_DISTANCE = LIGHT_MIN_DISTANCE + 200
+LIGHT_TRIGGER_MAX_DISTANCE = LIGHT_MAX_DISTANCE + 1000
 
 
 # --------------------------------------------------

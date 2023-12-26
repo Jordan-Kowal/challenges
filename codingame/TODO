@@ -38,6 +38,7 @@
   - ~~Do not chase a missing fish~~
   - ~~Monster: Avoid monster~~
   - ~~Do not move out of bounds~~
+  - Scan and push the fish if enemy does not have it
 - Save:
   - ~~Go straight up~~
   - ~~Maybe scan if something really close (ie add light)~~
