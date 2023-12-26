@@ -84,7 +84,8 @@ class Player:
 
     @property
     def creature_ids_to_scan(self) -> Set[int]:
-        return set(FISHES_BY_IDS.keys()) - self.scanned_or_saved_creature_ids
+        available_ids = {c.id for c in FISHES_BY_IDS.values() if not c.is_gone}
+        return available_ids - self.scanned_or_saved_creature_ids
 
     def update_score_from_input(self) -> None:
         self.score = int(input())
@@ -164,8 +165,6 @@ class Drone:
         if self.is_returning and len(self.scanned_creature_ids) > 0:
             return self.go_straight_up()
         self.is_returning = False
-        if len(self.player.scanned_creature_ids) == 9:
-            return self.go_straight_up()
         if WIN_IF_RETURN:
             return self.go_straight_up()
         if TURN_COUNT < 4:
@@ -212,10 +211,57 @@ class Drone:
 
     def go_straight_up(self) -> None:
         self.is_returning = True
-        self.move(self.x, 500, 0)
+        fishes_within_range = [
+            fish_id
+            for fish_id in FISHES_BY_IDS.keys()
+            if LIGHT_MIN_DISTANCE
+            < DRONE_CREATURE_DISTANCE[(self.id, fish_id)]
+            < LIGHT_MAX_DISTANCE
+            and fish_id not in self.player.scanned_or_saved_creature_ids
+        ]
+        light = 1 if len(fishes_within_range) > 0 else 0
+        self.move(self.x, 500, light)
 
     def move(self, x: int, y: int, light: int) -> None:
+        monsters_are_close = any(
+            [
+                DRONE_CREATURE_DISTANCE[(self.id, monster_id)] < 1500
+                for monster_id in MONSTERS_BY_IDS.keys()
+            ]
+        )
+        # Maybe check if trajectory is at risk
+        attempts = 0
+        deg = 30
+        while monsters_are_close:
+            trajectory = []
+            for i in range(TRAJECTORY_STEP_COUNT):
+                vx, vy = compute_vx_vy_from_positions(
+                    self.position,
+                    (x, y),
+                    int(DRONE_SPEED * (i + 1) / TRAJECTORY_STEP_COUNT),
+                )
+                trajectory.append((self.x + vx, self.y + vy))
+            if self.is_trajectory_is_safe(trajectory):
+                break
+            # Update trajectory
+            attempts += 1
+            rotation = attempts // 2 if attempts % 2 != 0 else -attempts // 2
+            x, y = rotate_point_on_circle((self.x, self.y), (x, y), rotation * deg)
+            # Surrounded, let it die
+            if attempts > 12:
+                break
         print(f"MOVE {x} {y} {light}")
+
+    @staticmethod
+    def is_trajectory_is_safe(trajectory: List[Position]) -> bool:
+        for monster in MONSTERS_BY_IDS.values():
+            if not monster.is_visible:
+                continue
+            if check_if_positions_cross_within_distance(
+                trajectory, monster.trajectory, MONSTER_KILL_RANGE + 100
+            ):
+                return False
+        return True
 
 
 class Creature:
@@ -237,7 +283,7 @@ class Creature:
         self.is_gone: bool = False
         self.is_visible: bool = False
         self.last_visible_turn: Optional[int] = None
-        self.position_track: List[Position] = []
+        self.trajectory: List[Position] = []
         # Grid
         self.x_min, self.x_max = 0, GRID_WIDTH
         self.y_min, self.y_max = DEPTHS_BY_TYPE[_type]
@@ -300,7 +346,7 @@ class Creature:
         return MONSTER_PASSIVE_SPEED
 
     def compute_position_for_turn(self) -> None:
-        self.position_track = []
+        self.trajectory = []
         if self.is_visible or self.is_gone:
             return
         # Update width range based on radar info
@@ -394,7 +440,7 @@ class Creature:
         self.last_turn_radar_info = self.radar_info
         self.radar_info = data
 
-    def compute_position_track_for_turn(self) -> None:
+    def compute_trajectory_for_turn(self) -> None:
         next_position = self.x + self.vx, self.y + self.vy
         speed = self.speed
         track: List[Position] = []
@@ -405,7 +451,7 @@ class Creature:
                 int(speed * (i + 1) / TRAJECTORY_STEP_COUNT),
             )
             track.append((self.x + vx, self.y + vy))
-        self.position_track = track
+        self.trajectory = track
 
 
 # --------------------------------------------------
@@ -427,8 +473,6 @@ def update_creatures_visibility_from_input() -> None:
     visible_ids = set()
     for _ in range(visible_creature_count):
         creature_id, *data = [int(j) for j in input().split()]
-        if creature_id == 16:
-            debug(f"Monster 16: {data}")
         creature = ALL_CREATURES_BY_ID.get(creature_id)
         creature.update_visible_position(*data)
         visible_ids.add(creature_id)
@@ -559,6 +603,15 @@ def debug(message) -> None:
     print(message, file=sys.stderr, flush=True)
 
 
+def check_if_positions_cross_within_distance(
+    trajectory1: List[Position], trajectory2: List[Position], distance: int
+) -> bool:
+    for pos1, pos2 in zip(trajectory1, trajectory2):
+        if compute_distance(pos1, pos2) < distance:
+            return True
+    return False
+
+
 def compute_vx_vy_from_positions(
     pos1: Position, pos2: Position, distance: int
 ) -> Tuple[int, int]:
@@ -570,8 +623,29 @@ def compute_vx_vy_from_positions(
     dy = y2 - y1
     dh = (dx**2 + dy**2) ** 0.5
     # TODO: Extract this for performance
-    ratio = math.ceil(dh / distance)
-    return dx / ratio, dy / ratio
+    ratio = dh / distance
+    return int(dx / ratio), int(dy / ratio)
+
+
+def rotate_point_on_circle(center: Position, point: Position, degrees: int) -> Position:
+    x, y = center
+    x2, y2 = point
+    # Convert the angle from degrees to radians
+    angle_rad = math.radians(degrees)
+    # Translate the point to the origin
+    x2_translated = x2 - x
+    y2_translated = y2 - y
+    # Perform the rotation
+    x2_rotated = x2_translated * math.cos(angle_rad) - y2_translated * math.sin(
+        angle_rad
+    )
+    y2_rotated = x2_translated * math.sin(angle_rad) + y2_translated * math.cos(
+        angle_rad
+    )
+    # Translate the point back
+    x2_new = x2_rotated + x
+    y2_new = y2_rotated + y
+    return int(x2_new), int(y2_new)
 
 
 def read_input() -> None:
@@ -599,7 +673,7 @@ def play_turn() -> None:
     # Compute monsters progress
     for monster in MONSTERS_BY_IDS.values():
         if monster.is_visible:
-            monster.compute_position_track_for_turn()
+            monster.compute_trajectory_for_turn()
     # Saving now might make us win
     if check_if_returning_wins():
         for drone in ME.drones.values():

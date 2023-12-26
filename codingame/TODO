@@ -32,14 +32,11 @@
   - Guess what the foe will do next round
   - Guess if he is going back to base. Can I return before him? should I try to beat him?
 - Move:
-  - When multiple drone, go diagonally to 3000 and 7000 at start
+  - ~~When multiple drone, go diagonally to 3000 and 7000 at start~~
   - Get best 2-3 creatures and compute best trajectory
   - Make sure drones do not go to same target
-    - If 2 targets, better split
   - ~~Do not chase a missing fish~~
-  - Monster: No light if close monster
-  - Monster: Avoid monster and pick another target?
+  - ~~Monster: Avoid monster~~
 - Save:
   - ~~Go straight up~~
-  - Go back and diagonally
-  - Maybe scan if something really close (ie add light)
+  - ~~Maybe scan if something really close (ie add light)~~
