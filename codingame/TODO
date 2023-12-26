@@ -39,16 +39,8 @@
   - ~~Do not chase a missing fish~~
   - ~~Monster: Avoid monster~~
   - ~~Do not move out of bounds~~
-  - Scan and push the fish if enemy does not have it
+  - ~~Scan and push the fish if enemy does not have it~~
   - ~~If done, go push fish~~
 - Save:
   - ~~Go straight up~~
   - ~~Maybe scan if something really close (ie add light)~~
-
-
-I see fish
-I have scanned fish
-Fish is between me and wall
-Enemy has not scanned fish
-Fish is closed to wall
-Push it

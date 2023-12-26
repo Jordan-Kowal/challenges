@@ -175,6 +175,26 @@ class Drone:
         return [creature for creature, score in creature_data if score > 0]
 
     @property
+    def pushable_fish(self) -> Optional["Creature"]:
+        foe_missing_ids = self.player.foe.creature_ids_to_scan
+        missing_fishes = [FISHES_BY_IDS[i] for i in foe_missing_ids]
+        for fish in missing_fishes:
+            distance = DRONE_CREATURE_DISTANCE[(self.id, fish.id)]
+            is_left_side = self.x < GRID_WIDTH // 2
+            is_between_drone_and_wall = (is_left_side and fish.x < self.x) or (
+                not is_left_side and fish.x > self.x
+            )
+            is_close_to_wall = (
+                fish.x < PUSH_WALL_THRESHOLD
+                if is_left_side
+                else fish.x > GRID_WIDTH - PUSH_WALL_THRESHOLD
+            )
+            is_close_to_drone = distance < PUSH_DRONE_THRESHOLD
+            if is_between_drone_and_wall and is_close_to_wall and is_close_to_drone:
+                return fish
+        return None
+
+    @property
     def should_turn_on_light(self) -> bool:
         return any(
             [
@@ -192,6 +212,9 @@ class Drone:
         self.is_returning = False
         if WIN_IF_RETURN:
             return self.go_straight_up()
+        pushable_fish = self.pushable_fish
+        if pushable_fish is not None:
+            return self.move(*pushable_fish.next_position)
         if TURN_COUNT < INITIAL_TARGET_TURN_COUNT:
             return self.move_to_initial_coordinates()
         if self.emergency > 0:
@@ -755,8 +778,11 @@ MONSTER_AVOID_RANGE = MONSTER_KILL_RANGE
 LIGHT_TRIGGER_MIN_DISTANCE = LIGHT_MIN_DISTANCE + 200
 LIGHT_TRIGGER_MAX_DISTANCE = LIGHT_MAX_DISTANCE + 1000
 
-INITIAL_TARGET_TURN_COUNT = 10
-INITIAL_Y_TARGET = 7_500
+INITIAL_TARGET_TURN_COUNT = 9
+INITIAL_Y_TARGET = 7000
+
+PUSH_WALL_THRESHOLD = 2000
+PUSH_DRONE_THRESHOLD = 2000
 
 
 # --------------------------------------------------
