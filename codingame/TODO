@@ -35,6 +35,7 @@
   - ~~When multiple drone, go diagonally to 3000 and 7000 at start~~
   - Get best 2-3 creatures and compute best trajectory
   - Make sure drones do not go to same target
+  - Go to 2500 8000 and scan on the way
   - ~~Do not chase a missing fish~~
   - ~~Monster: Avoid monster~~
   - ~~Do not move out of bounds~~
