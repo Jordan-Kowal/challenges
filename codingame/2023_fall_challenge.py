@@ -196,7 +196,7 @@ class Drone:
 
     @property
     def should_turn_on_light(self) -> bool:
-        return any(
+        has_nearby_fishes = any(
             [
                 LIGHT_TRIGGER_MIN_DISTANCE
                 < DRONE_CREATURE_DISTANCE[(self.id, fish_id)]
@@ -205,16 +205,19 @@ class Drone:
                 for fish_id in FISHES_BY_IDS.keys()
             ]
         )
+        return has_nearby_fishes and TURN_COUNT > LIGHT_TURN_COUNT
 
     def play_turn(self) -> None:
+        if len(self.player.scanned_creature_ids) > 7:
+            return self.go_straight_up()
         if self.is_returning and self.has_scans:
             return self.go_straight_up()
         self.is_returning = False
         if WIN_IF_RETURN:
             return self.go_straight_up()
         pushable_fish = self.pushable_fish
-        if pushable_fish is not None:
-            return self.move(*pushable_fish.next_position)
+        if pushable_fish is not None and TURN_COUNT > PUSH_TURN_COUNT:
+            return self.move(*pushable_fish.best_push_position)
         if TURN_COUNT < INITIAL_TARGET_TURN_COUNT:
             return self.move_to_initial_coordinates()
         if self.emergency > 0:
@@ -276,7 +279,7 @@ class Drone:
         if self.other_drone.target_creature_id == fish.id and len(fishes) > 1:
             fish = fishes[1]
         self.target_creature_id = fish.id
-        self.move(*fish.next_position)
+        self.move(*fish.best_push_position)
 
     @staticmethod
     def wait(light: bool) -> None:
@@ -284,7 +287,7 @@ class Drone:
 
     def go_straight_up(self) -> None:
         self.is_returning = True
-        self.move(self.x, 500)
+        self.move(self.x, 480)
 
     def move(self, x: int, y: int) -> None:
         initial_x, initial_y = x, y
@@ -344,6 +347,12 @@ class Creature:
     @property
     def next_position(self) -> Tuple[int, int]:
         return self.x + self.vx, self.y + self.vy
+
+    @property
+    def best_push_position(self) -> Tuple[int, int]:
+        if self.x < GRID_WIDTH // 2:
+            return self.x + 100, self.y
+        return self.x - 100, self.y
 
     @property
     def max_area(self) -> Area:
@@ -775,12 +784,14 @@ SAME_COLOR_FACTOR = 1
 TRAJECTORY_STEP_COUNT = 50
 MONSTER_AVOID_RANGE = MONSTER_KILL_RANGE + 50
 
-LIGHT_TRIGGER_MIN_DISTANCE = LIGHT_MIN_DISTANCE + 200
+LIGHT_TRIGGER_MIN_DISTANCE = LIGHT_MIN_DISTANCE + 600
 LIGHT_TRIGGER_MAX_DISTANCE = LIGHT_MAX_DISTANCE + 1000
+LIGHT_TURN_COUNT = 5
 
 INITIAL_TARGET_TURN_COUNT = 9
 INITIAL_Y_TARGET = 7000
 
+PUSH_TURN_COUNT = 10
 PUSH_WALL_THRESHOLD = 1500
 PUSH_DRONE_THRESHOLD = 1500
 
