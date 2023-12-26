@@ -85,8 +85,11 @@ class Player:
 
     @property
     def creature_ids_to_scan(self) -> Set[int]:
-        available_ids = {c.id for c in FISHES_BY_IDS.values() if not c.is_gone}
-        return available_ids - self.scanned_or_saved_creature_ids
+        return get_available_fish_ids() - self.scanned_or_saved_creature_ids
+
+    @property
+    def has_scans_left(self) -> bool:
+        return len(self.creature_ids_to_scan) > 0
 
     def update_score_from_input(self) -> None:
         self.score = int(input())
@@ -119,12 +122,21 @@ class Drone:
         self.last_turn_scanned_creature_ids: Set[int] = set()
         self.last_turn_light: bool = False
         self.is_returning: bool = False
+        self.target_creature_id: Optional[int] = None
 
     def __str__(self) -> str:
         return f"Drone {self.id} ({self.position}) for {self.player}"
 
     def __repr__(self) -> str:
         return str(self)
+
+    @property
+    def other_drone(self) -> "Drone":
+        return [d for d in self.player.drones.values() if d.id != self.id][0]
+
+    @property
+    def has_scans(self) -> bool:
+        return len(self.scanned_creature_ids) > 0
 
     @property
     def position(self) -> Tuple[int, int]:
@@ -176,7 +188,7 @@ class Drone:
 
     def play_turn(self) -> None:
         # Keep returning
-        if self.is_returning and len(self.scanned_creature_ids) > 0:
+        if self.is_returning and self.has_scans:
             return self.go_straight_up()
         self.is_returning = False
         if WIN_IF_RETURN:
@@ -184,10 +196,15 @@ class Drone:
         if TURN_COUNT < INITIAL_TARGET_TURN_COUNT:
             return self.move_to_initial_coordinates()
         if self.emergency > 0:
-            return self.wait(0)
-        if len(self.player.creature_ids_to_scan) == 0:
-            return self.go_straight_up()
+            return self.wait(False)
+        if not self.player.has_scans_left:
+            if self.has_scans:
+                return self.go_straight_up()
+            return self.push_fish()
         return self.move_to_best_creature()
+
+    def reset_turn(self) -> None:
+        self.target_creature_id = None
 
     def update_vitals(self, x: int, y: int, emergency: int, battery: int) -> None:
         self.x = x
@@ -216,9 +233,22 @@ class Drone:
         y = INITIAL_Y_TARGET
         self.move(x, y)
 
+    def push_fish(self) -> None:
+        foe = self.player.foe
+        missing_ids = foe.creature_ids_to_scan
+        if not missing_ids:
+            return self.go_straight_up()
+        fishes = [FISHES_BY_IDS[i] for i in missing_ids]
+        fishes.sort(key=lambda x: DRONE_CREATURE_DISTANCE[(self.id, x.id)])
+        fish = fishes[0]
+        if self.other_drone.target_creature_id == fish.id and len(fishes) > 1:
+            fish = fishes[1]
+        self.target_creature_id = fish.id
+        self.move(*fish.next_position)
+
     @staticmethod
-    def wait(light: int) -> None:
-        print(f"WAIT {light}")
+    def wait(light: bool) -> None:
+        print(f"WAIT {int(light)}")
 
     def go_straight_up(self) -> None:
         self.is_returning = True
@@ -653,6 +683,10 @@ def check_if_returning_wins() -> bool:
 # --------------------------------------------------
 # Utils
 # --------------------------------------------------
+def get_available_fish_ids() -> Set[int]:
+    return {c.id for c in FISHES_BY_IDS.values() if not c.is_gone}
+
+
 def debug(message) -> None:
     print(message, file=sys.stderr, flush=True)
 
@@ -694,6 +728,9 @@ def play_turn() -> None:
     for drone_id in ME.ordered_drone_ids:
         drone = ME.drones[drone_id]
         drone.play_turn()
+    for drone_id in ME.ordered_drone_ids:
+        drone = ME.drones[drone_id]
+        drone.reset_turn()
 
 
 # --------------------------------------------------
