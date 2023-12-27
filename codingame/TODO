@@ -33,7 +33,6 @@
   - Guess if he is going back to base. Can I return before him? should I try to beat him?
 - Move:
   - ~~When multiple drone, go diagonally to 3000 and 7000 at start~~
-  - Get best 2-3 creatures and compute best trajectory
   - ~~Make sure drones do not go to same target~~
   - ~~Go to 2500 8000 and scan on the way~~
   - ~~Do not chase a missing fish~~
@@ -41,6 +40,9 @@
   - ~~Do not move out of bounds~~
   - ~~Scan and push the fish if enemy does not have it~~
   - ~~If done, go push fish~~
+  - Get best 2-3 creatures and compute best trajectory
+  - Bring bad guys onto the enemy (go to fish, slow down, go to enemy)
+  - Remove early return?
 - Save:
   - ~~Go straight up~~
   - ~~Maybe scan if something really close (ie add light)~~

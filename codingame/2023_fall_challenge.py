@@ -208,24 +208,37 @@ class Drone:
         return has_nearby_fishes and TURN_COUNT > LIGHT_TURN_COUNT
 
     def play_turn(self) -> None:
+        # Early return
         if len(self.player.scanned_creature_ids) > 7:
             return self.go_straight_up()
+        # Keep returning
         if self.is_returning and self.has_scans:
             return self.go_straight_up()
         self.is_returning = False
+        # Return if winnable
         if WIN_IF_RETURN:
             return self.go_straight_up()
+        # Maybe push fish if useful
         pushable_fish = self.pushable_fish
-        if pushable_fish is not None and TURN_COUNT > PUSH_TURN_COUNT:
+        if (
+            pushable_fish is not None
+            and TURN_COUNT > PUSH_TURN_COUNT
+            and not self.is_being_chased
+        ):
             return self.move(*pushable_fish.best_push_position)
+        # Initial movement
         if TURN_COUNT < INITIAL_TARGET_TURN_COUNT:
             return self.move_to_initial_coordinates()
+        # You dead
         if self.emergency > 0:
             return self.wait(False)
+        # Save your scans if no more scans left
+        if not self.player.has_scans_left and self.has_scans:
+            return self.go_straight_up()
+        # Nothing to do? Try to push fish
         if not self.player.has_scans_left:
-            if self.has_scans:
-                return self.go_straight_up()
             return self.push_fish()
+        # Go scan the best creature
         best_creature = self.get_best_creature()
         if best_creature is None:
             if self.has_scans:
