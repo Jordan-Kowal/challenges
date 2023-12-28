@@ -123,12 +123,17 @@ class Drone:
         self.last_turn_light: bool = False
         self.is_returning: bool = False
         self.target_creature_id: Optional[int] = None
+        self.debug_text: str = ""
 
     def __str__(self) -> str:
         return f"Drone {self.id} ({self.position}) for {self.player}"
 
     def __repr__(self) -> str:
         return str(self)
+
+    @property
+    def text(self) -> str:
+        return self.debug_text if DEBUG else ""
 
     @property
     def other_drone(self) -> "Drone":
@@ -175,6 +180,14 @@ class Drone:
         return [creature for creature, score in creature_data if score > 0]
 
     @property
+    def best_creatures_on_the_way_up(self) -> List["Creature"]:
+        return [
+            creature
+            for creature in self.best_creatures
+            if creature.y < self.y and abs(creature.x - self.x) < 1500
+        ]
+
+    @property
     def pushable_fish(self) -> Optional["Creature"]:
         foe_missing_ids = self.player.foe.creature_ids_to_scan
         missing_fishes = [FISHES_BY_IDS[i] for i in foe_missing_ids]
@@ -207,45 +220,6 @@ class Drone:
         )
         return has_nearby_fishes and TURN_COUNT > LIGHT_TURN_COUNT
 
-    def play_turn(self) -> None:
-        # Early return
-        if len(self.player.scanned_creature_ids) > 7:
-            return self.go_straight_up()
-        # Keep returning
-        if self.is_returning and self.has_scans:
-            return self.go_straight_up()
-        self.is_returning = False
-        # Return if winnable
-        if WIN_IF_RETURN:
-            return self.go_straight_up()
-        # Maybe push fish if useful
-        pushable_fish = self.pushable_fish
-        if (
-            pushable_fish is not None
-            and TURN_COUNT > PUSH_TURN_COUNT
-            and not self.is_being_chased
-        ):
-            return self.move(*pushable_fish.best_push_position)
-        # Initial movement
-        if TURN_COUNT < INITIAL_TARGET_TURN_COUNT:
-            return self.move_to_initial_coordinates()
-        # You dead
-        if self.emergency > 0:
-            return self.wait(False)
-        # Save your scans if no more scans left
-        if not self.player.has_scans_left and self.has_scans:
-            return self.go_straight_up()
-        # Nothing to do? Try to push fish
-        if not self.player.has_scans_left:
-            return self.push_fish()
-        # Go scan the best creature
-        best_creature = self.get_best_creature()
-        if best_creature is None:
-            if self.has_scans:
-                return self.go_straight_up()
-            return self.push_fish()
-        return self.move(*best_creature.next_position)
-
     def reset_turn(self) -> None:
         self.target_creature_id = None
 
@@ -265,42 +239,101 @@ class Drone:
             self.last_turn_scanned_creature_ids = set()
         self.scanned_creature_ids = scanned_ids
 
-    def get_best_creature(self) -> Optional["Creature"]:
-        best_creatures = self.best_creatures
-        creature = best_creatures[0]
+    def target_first_available_creature(
+        self, sorted_creature_list: List["Creature"]
+    ) -> Optional["Creature"]:
+        if len(sorted_creature_list) == 0:
+            return None
+        creature = sorted_creature_list[0]
         # Target check
         if self.other_drone.target_creature_id == creature.id:
-            if len(best_creatures) > 1:
-                creature = best_creatures[1]
+            if len(sorted_creature_list) > 1:
+                creature = sorted_creature_list[1]
             else:
                 creature = None
         # Move to target
         self.target_creature_id = creature.id if creature else None
         return creature
 
-    def move_to_initial_coordinates(self) -> None:
-        self.move(self.x, INITIAL_Y_TARGET)
-
-    def push_fish(self) -> None:
-        foe = self.player.foe
-        missing_ids = foe.creature_ids_to_scan
-        if not missing_ids:
+    def play_turn(self) -> None:
+        # Early return
+        if len(self.scanned_creature_ids) >= 5:
+            self.debug_text = "Save: 5"
             return self.go_straight_up()
-        fishes = [FISHES_BY_IDS[i] for i in missing_ids]
-        fishes.sort(key=lambda x: DRONE_CREATURE_DISTANCE[(self.id, x.id)])
-        fish = fishes[0]
-        if self.other_drone.target_creature_id == fish.id and len(fishes) > 1:
-            fish = fishes[1]
-        self.target_creature_id = fish.id
-        self.move(*fish.best_push_position)
+        # Keep returning
+        if self.is_returning and self.has_scans:
+            self.debug_text = "Save: Keep going"
+            return self.go_straight_up()
+        self.is_returning = False
+        # Return if winnable
+        if WIN_IF_RETURN:
+            self.debug_text = "Save: winnable"
+            return self.go_straight_up()
+        # Maybe push fish if useful
+        pushable_fish = self.pushable_fish
+        if (
+            pushable_fish is not None
+            and TURN_COUNT > PUSH_TURN_COUNT
+            and not self.is_being_chased
+        ):
+            self.debug_text = "Push: target"
+            return self.push_fish(pushable_fish)
+        # Initial movement
+        if TURN_COUNT < INITIAL_TARGET_TURN_COUNT:
+            self.debug_text = "Move: init"
+            return self.move(self.x, INITIAL_Y_TARGET)
+        # You dead
+        if self.emergency > 0:
+            self.debug_text = "Wait: dead"
+            return self.wait(False)
+        # Save your scans if no more scans left
+        if not self.player.has_scans_left and self.has_scans:
+            self.debug_text = "Save: no scans left"
+            return self.go_straight_up()
+        # Nothing to do? Try to push fish
+        if not self.player.has_scans_left:
+            self.debug_text = "Push: no scans left"
+            return self.push_fish(None)
+        # Go scan the best creature
+        best_creature = self.target_first_available_creature(self.best_creatures)
+        if best_creature is None:
+            if self.has_scans:
+                self.debug_text = "Save: done"
+                return self.go_straight_up()
+            self.debug_text = "Push: no target"
+            return self.push_fish(None)
+        self.debug_text = "Move: target"
+        return self.move(*best_creature.next_position)
 
-    @staticmethod
-    def wait(light: bool) -> None:
-        print(f"WAIT {int(light)}")
+    def push_fish(self, target: Optional["Creature"] = None) -> None:
+        if target is None:
+            foe = self.player.foe
+            missing_ids = foe.creature_ids_to_scan
+            if not missing_ids:
+                return self.go_straight_up()
+            fishes = [FISHES_BY_IDS[i] for i in missing_ids]
+            fishes.sort(key=lambda x: DRONE_CREATURE_DISTANCE[(self.id, x.id)])
+            fish = fishes[0]
+            if self.other_drone.target_creature_id == fish.id and len(fishes) > 1:
+                fish = fishes[1]
+        else:
+            fish = target
+        self.target_creature_id = fish.id
+        x, y = fish.best_push_position
+        self.move(x, y)
+
+    def wait(self, light: bool) -> None:
+        print(f"WAIT {int(light)} {self.text}")
 
     def go_straight_up(self) -> None:
         self.is_returning = True
-        self.move(self.x, 480)
+        target = self.target_first_available_creature(self.best_creatures_on_the_way_up)
+        if not target:
+            return self.move(self.x, 480)
+        else:
+            self.debug_text += f" & scan"
+            x, y = target.next_position
+            return self.move(x, y)
 
     def move(self, x: int, y: int) -> None:
         initial_x, initial_y = x, y
@@ -317,7 +350,7 @@ class Drone:
             x, y = rotate_point_on_circle(
                 (self.x, self.y), (initial_x, initial_y), rotation * deg
             )
-        print(f"MOVE {x} {y} {int(self.should_turn_on_light)}")
+        print(f"MOVE {x} {y} {int(self.should_turn_on_light)} {self.text}")
 
 
 class Creature:
@@ -797,9 +830,9 @@ SAME_COLOR_FACTOR = 1
 TRAJECTORY_STEP_COUNT = 50
 MONSTER_AVOID_RANGE = MONSTER_KILL_RANGE + 50
 
-LIGHT_TRIGGER_MIN_DISTANCE = LIGHT_MIN_DISTANCE + 600
-LIGHT_TRIGGER_MAX_DISTANCE = LIGHT_MAX_DISTANCE + 1000
-LIGHT_TURN_COUNT = 5
+LIGHT_TRIGGER_MIN_DISTANCE = LIGHT_MIN_DISTANCE + 400
+LIGHT_TRIGGER_MAX_DISTANCE = LIGHT_MAX_DISTANCE + 800
+LIGHT_TURN_COUNT = 6
 
 INITIAL_TARGET_TURN_COUNT = 9
 INITIAL_Y_TARGET = 7000
@@ -819,6 +852,7 @@ MONSTERS_BY_IDS: Dict[int, Creature] = {}
 MISSING_CREATURE_IDS: Set[int] = set()
 DRONE_CREATURE_DISTANCE: Dict[Tuple[int, int], int] = {}
 WIN_IF_RETURN = False
+DEBUG = True
 
 ME = Player(is_me=True)
 FOE = Player(is_me=False)
