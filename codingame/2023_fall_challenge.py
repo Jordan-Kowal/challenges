@@ -249,8 +249,6 @@ class Drone:
         if self.other_drone.target_creature_id == creature.id:
             if len(sorted_creature_list) > 1:
                 creature = sorted_creature_list[1]
-            else:
-                creature = None
         # Move to target
         self.target_creature_id = creature.id if creature else None
         return creature
