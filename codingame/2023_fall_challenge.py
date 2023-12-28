@@ -144,6 +144,10 @@ class Drone:
         return len(self.scanned_creature_ids) > 0
 
     @property
+    def distinct_scanned_creature_ids(self) -> Set[int]:
+        return self.scanned_creature_ids - self.other_drone.scanned_creature_ids
+
+    @property
     def position(self) -> Tuple[int, int]:
         return self.x, self.y
 
@@ -241,21 +245,32 @@ class Drone:
 
     def target_first_available_creature(
         self, sorted_creature_list: List["Creature"]
-    ) -> Optional["Creature"]:
+    ) -> Optional[Position]:
         if len(sorted_creature_list) == 0:
+            self.target_creature_id = None
             return None
         creature = sorted_creature_list[0]
         # Target check
         if self.other_drone.target_creature_id == creature.id:
             if len(sorted_creature_list) > 1:
                 creature = sorted_creature_list[1]
+        # Fishes that are close to the main one
+        close_fishes = [
+            c
+            for c in sorted_creature_list
+            if compute_distance(creature.position, c.position) < TRIANGULATE_DISTANCE
+        ]
+        coordinates = compute_middle([c.next_position for c in close_fishes])
         # Move to target
-        self.target_creature_id = creature.id if creature else None
-        return creature
+        self.target_creature_id = creature.id
+        return coordinates
 
     def play_turn(self) -> None:
         # Early return
-        if len(self.scanned_creature_ids) >= 5:
+        if (
+            len(self.scanned_creature_ids) >= SCAN_COUNT_TO_RETURN
+            and len(self.distinct_scanned_creature_ids) >= DISTINCT_SCAN_COUNT_TO_RETURN
+        ):
             self.debug_text = "Save: 5"
             return self.go_straight_up()
         # Keep returning
@@ -279,7 +294,12 @@ class Drone:
         # Initial movement
         if TURN_COUNT < INITIAL_TARGET_TURN_COUNT:
             self.debug_text = "Move: init"
-            return self.move(self.x, INITIAL_Y_TARGET)
+            initial_x = (
+                INITIAL_X_TARGET_LEFT
+                if self.x < GRID_WIDTH // 2
+                else INITIAL_X_TARGET_RIGHT
+            )
+            return self.move(initial_x, INITIAL_Y_TARGET)
         # You dead
         if self.emergency > 0:
             self.debug_text = "Wait: dead"
@@ -293,15 +313,15 @@ class Drone:
             self.debug_text = "Push: no scans left"
             return self.push_fish(None)
         # Go scan the best creature
-        best_creature = self.target_first_available_creature(self.best_creatures)
-        if best_creature is None:
+        coordinates = self.target_first_available_creature(self.best_creatures)
+        if coordinates is None:
             if self.has_scans:
                 self.debug_text = "Save: done"
                 return self.go_straight_up()
             self.debug_text = "Push: no target"
             return self.push_fish(None)
         self.debug_text = "Move: target"
-        return self.move(*best_creature.next_position)
+        return self.move(*coordinates)
 
     def push_fish(self, target: Optional["Creature"] = None) -> None:
         if target is None:
@@ -310,7 +330,7 @@ class Drone:
             if not missing_ids:
                 return self.go_straight_up()
             fishes = [FISHES_BY_IDS[i] for i in missing_ids]
-            fishes.sort(key=lambda x: DRONE_CREATURE_DISTANCE[(self.id, x.id)])
+            fishes.sort(key=lambda f: DRONE_CREATURE_DISTANCE[(self.id, f.id)])
             fish = fishes[0]
             if self.other_drone.target_creature_id == fish.id and len(fishes) > 1:
                 fish = fishes[1]
@@ -325,29 +345,46 @@ class Drone:
 
     def go_straight_up(self) -> None:
         self.is_returning = True
-        target = self.target_first_available_creature(self.best_creatures_on_the_way_up)
-        if not target:
+        coordinates = self.target_first_available_creature(
+            self.best_creatures_on_the_way_up
+        )
+        if coordinates is None:
             return self.move(self.x, 480)
         else:
             self.debug_text += f" & scan"
-            x, y = target.next_position
-            return self.move(x, y)
+            return self.move(*coordinates)
 
     def move(self, x: int, y: int) -> None:
         initial_x, initial_y = x, y
-        # Maybe check if trajectory is at risk
+        # Compute trajectories
+        trajectories: List[List[Position]] = []
         attempts = 1
         deg = 30
         while attempts <= 12:
             trajectory = compute_trajectory(self.position, (x, y), DRONE_SPEED)
-            if is_trajectory_is_safe(trajectory) and is_trajectory_valid(trajectory):
-                break
-            # Update trajectory
+            trajectories.append(trajectory)
             attempts += 1
             rotation = attempts // 2 if attempts % 2 != 0 else -attempts // 2
             x, y = rotate_point_on_circle(
                 (self.x, self.y), (initial_x, initial_y), rotation * deg
             )
+        # Keep valid trajectories
+        valid_trajectories = [
+            trajectory
+            for trajectory in trajectories
+            if is_trajectory_is_safe(trajectory) and is_trajectory_valid(trajectory)
+        ]
+        # Get best trajectory
+        if not valid_trajectories:
+            return self.wait(self.should_turn_on_light)
+        elif len(valid_trajectories) < 12:
+            valid_trajectories.sort(
+                key=lambda t: compute_distance((initial_x, initial_y), t[-1])
+            )
+            x, y = valid_trajectories[0][-1]
+        else:
+            trajectory = valid_trajectories[0]
+            x, y = trajectory[-1]
         print(f"MOVE {x} {y} {int(self.should_turn_on_light)} {self.text}")
 
 
@@ -443,12 +480,7 @@ class Creature:
         if self.is_visible or self.is_gone:
             return
         # Update width range based on radar info
-        for drone_id, radar in self.radar_info.items():
-            drone = ME.drones[drone_id]
-            if "L" in radar and drone.x < GRID_WIDTH // 2:
-                self.width_min, self.width_max = 0, GRID_WIDTH // 2
-            elif "R" in radar and drone.x >= GRID_WIDTH // 2:
-                self.width_min, self.width_max = GRID_WIDTH // 2, GRID_WIDTH
+        self.update_max_width_from_radar()
         # Compute area from previous but within bounds
         area = increase_area(self.area, CREATURE_SPEED)
         area = compute_area_overlap(area, self.max_area)
@@ -487,6 +519,14 @@ class Creature:
         self.y = (self.y_min + self.y_max) // 2
         self.vx = 0
         self.vy = 0
+
+    def update_max_width_from_radar(self) -> None:
+        for drone_id, radar in self.radar_info.items():
+            drone = ME.drones[drone_id]
+            if "L" in radar and drone.x < GRID_WIDTH // 2:
+                self.width_min, self.width_max = 0, GRID_WIDTH // 2
+            elif "R" in radar and drone.x >= GRID_WIDTH // 2:
+                self.width_min, self.width_max = GRID_WIDTH // 2, GRID_WIDTH
 
     def compute_score_for_drone(self, drone: Drone) -> float:
         # Skip if missing or already scanned/saved or monster
@@ -699,6 +739,12 @@ def rotate_point_on_circle(center: Position, point: Position, degrees: int) -> P
     return int(x2_new), int(y2_new)
 
 
+def compute_middle(points: List[Position]) -> Position:
+    x = sum([p[0] for p in points]) // len(points)
+    y = sum([p[1] for p in points]) // len(points)
+    return x, y
+
+
 # --------------------------------------------------
 # Score
 # --------------------------------------------------
@@ -833,11 +879,18 @@ LIGHT_TRIGGER_MAX_DISTANCE = LIGHT_MAX_DISTANCE + 800
 LIGHT_TURN_COUNT = 6
 
 INITIAL_TARGET_TURN_COUNT = 9
-INITIAL_Y_TARGET = 7000
+INITIAL_Y_TARGET = 7_000
+INITIAL_X_TARGET_LEFT = 3_000
+INITIAL_X_TARGET_RIGHT = 7_000
 
 PUSH_TURN_COUNT = 10
-PUSH_WALL_THRESHOLD = 1500
-PUSH_DRONE_THRESHOLD = 1500
+PUSH_WALL_THRESHOLD = 1_500
+PUSH_DRONE_THRESHOLD = 1_500
+
+TRIANGULATE_DISTANCE = 1_000
+
+SCAN_COUNT_TO_RETURN = 5
+DISTINCT_SCAN_COUNT_TO_RETURN = 4
 
 
 # --------------------------------------------------
