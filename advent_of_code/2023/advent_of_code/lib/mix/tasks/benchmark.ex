@@ -5,7 +5,33 @@ defmodule Mix.Tasks.Benchmark do
 
   use Mix.Task
 
-  @modules [Mix.Tasks.Day1, Mix.Tasks.Day2, Mix.Tasks.Day3, Mix.Tasks.Day4]
+  @modules [
+    Mix.Tasks.Day1,
+    Mix.Tasks.Day2,
+    Mix.Tasks.Day3,
+    Mix.Tasks.Day4,
+    Mix.Tasks.Day5
+    # Mix.Tasks.Day6,
+    # Mix.Tasks.Day7,
+    # Mix.Tasks.Day8,
+    # Mix.Tasks.Day9,
+    # Mix.Tasks.Day10,
+    # Mix.Tasks.Day11,
+    # Mix.Tasks.Day12,
+    # Mix.Tasks.Day13,
+    # Mix.Tasks.Day14,
+    # Mix.Tasks.Day15,
+    # Mix.Tasks.Day16,
+    # Mix.Tasks.Day17,
+    # Mix.Tasks.Day18,
+    # Mix.Tasks.Day19,
+    # Mix.Tasks.Day20,
+    # Mix.Tasks.Day21,
+    # Mix.Tasks.Day22,
+    # Mix.Tasks.Day23,
+    # Mix.Tasks.Day24,
+    # Mix.Tasks.Day25
+  ]
   @padding 10
   @iterations 1
 
