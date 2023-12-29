@@ -2,5 +2,4 @@
 - Creature within 1400u of moving ship will move in opposite direction.
 - Compute vx/vy if fleeing (ie within motor)
 - Enemy:
-  - Get best 2-3 creatures and compute best trajectory
   - Bring bad guys onto the enemy (go to fish, slow down, go to enemy)

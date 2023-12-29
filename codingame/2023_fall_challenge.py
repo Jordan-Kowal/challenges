@@ -194,7 +194,10 @@ class Drone:
     @property
     def pushable_fish(self) -> Optional["Creature"]:
         foe_missing_ids = self.player.foe.creature_ids_to_scan
-        missing_fishes = [FISHES_BY_IDS[i] for i in foe_missing_ids]
+        missing_fishes = [
+            FISHES_BY_IDS[i]
+            for i in self.player.scanned_or_saved_creature_ids & foe_missing_ids
+        ]
         for fish in missing_fishes:
             distance = DRONE_CREATURE_DISTANCE[(self.id, fish.id)]
             is_left_side = self.x < GRID_WIDTH // 2
@@ -278,10 +281,6 @@ class Drone:
             self.debug_text = "Save: Keep going"
             return self.go_straight_up()
         self.is_returning = False
-        # Return if winnable
-        if WIN_IF_RETURN:
-            self.debug_text = "Save: winnable"
-            return self.go_straight_up()
         # Maybe push fish if useful
         pushable_fish = self.pushable_fish
         if (
@@ -294,12 +293,7 @@ class Drone:
         # Initial movement
         if TURN_COUNT < INITIAL_TARGET_TURN_COUNT:
             self.debug_text = "Move: init"
-            initial_x = (
-                INITIAL_X_TARGET_LEFT
-                if self.x < GRID_WIDTH // 2
-                else INITIAL_X_TARGET_RIGHT
-            )
-            return self.move(initial_x, INITIAL_Y_TARGET)
+            return self.move(self.x, INITIAL_Y_TARGET)
         # You dead
         if self.emergency > 0:
             self.debug_text = "Wait: dead"
@@ -519,8 +513,21 @@ class Creature:
         self.x_min, self.y_min, self.x_max, self.y_max = area
         self.x = (self.x_min + self.x_max) // 2
         self.y = (self.y_min + self.y_max) // 2
+
+    def compute_movement_for_turn(self) -> None:
+        if self.is_visible or self.is_gone or self.is_monster:
+            return
         self.vx = 0
         self.vy = 0
+        for drone in DRONES_BY_ID.values():
+            distance = DRONE_CREATURE_DISTANCE[(drone.id, self.id)]
+            if distance > CREATURE_FLEE_RANGE:
+                continue
+            vx, vy = compute_vx_vy_from_positions(
+                drone.position, self.position, CREATURE_SPEED
+            )
+            self.vx = vx
+            self.vy = vy
 
     def update_max_width_from_radar(self) -> None:
         for drone_id, radar in self.radar_info.items():
@@ -857,8 +864,12 @@ def play_turn() -> None:
     for creature in ALL_CREATURES_BY_ID.values():
         creature.compute_position_for_turn()
         for drone in DRONES_BY_ID.values():
-            distance = compute_distance(drone.position, creature.next_position)
+            distance = compute_distance(drone.position, creature.position)
             DRONE_CREATURE_DISTANCE[(drone.id, creature.id)] = distance
+        creature.compute_movement_for_turn()
+        for drone in DRONES_BY_ID.values():
+            distance = compute_distance(drone.position, creature.next_position)
+            DRONE_CREATURE_DISTANCE_NEXT[(drone.id, creature.id)] = distance
     # Compute monsters progress
     for monster in MONSTERS_BY_IDS.values():
         if monster.is_visible:
@@ -880,22 +891,20 @@ def play_turn() -> None:
 # Params
 # --------------------------------------------------
 VALUE_FACTOR = 1.5
-SAME_TYPE_FACTOR = 1
-SAME_COLOR_FACTOR = 1
+SAME_TYPE_FACTOR = 1.2
+SAME_COLOR_FACTOR = 1.2
 
-TRAJECTORY_STEP_COUNT = 50
-MONSTER_AVOID_RANGE = MONSTER_KILL_RANGE + 50
+TRAJECTORY_STEP_COUNT = 100
+MONSTER_AVOID_RANGE = MONSTER_KILL_RANGE + 100
 
-LIGHT_TRIGGER_MIN_DISTANCE = LIGHT_MIN_DISTANCE + 400
-LIGHT_TRIGGER_MAX_DISTANCE = LIGHT_MAX_DISTANCE + 800
+LIGHT_TRIGGER_MIN_DISTANCE = LIGHT_MIN_DISTANCE
+LIGHT_TRIGGER_MAX_DISTANCE = LIGHT_MAX_DISTANCE
 LIGHT_TURN_COUNT = 4
 
-INITIAL_TARGET_TURN_COUNT = 9
+INITIAL_TARGET_TURN_COUNT = 8
 INITIAL_Y_TARGET = 7_000
-INITIAL_X_TARGET_LEFT = 3_000
-INITIAL_X_TARGET_RIGHT = 7_000
 
-PUSH_TURN_COUNT = 10
+PUSH_TURN_COUNT = 0
 PUSH_WALL_THRESHOLD = 1_500
 PUSH_DRONE_THRESHOLD = 1_500
 
@@ -914,8 +923,8 @@ FISHES_BY_IDS: Dict[int, Creature] = {}
 MONSTERS_BY_IDS: Dict[int, Creature] = {}
 MISSING_CREATURE_IDS: Set[int] = set()
 DRONE_CREATURE_DISTANCE: Dict[Tuple[int, int], int] = {}
-WIN_IF_RETURN = False
-DEBUG = True
+DRONE_CREATURE_DISTANCE_NEXT: Dict[Tuple[int, int], int] = {}
+DEBUG = False
 
 ME = Player(is_me=True)
 FOE = Player(is_me=False)
