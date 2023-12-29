@@ -215,6 +215,19 @@ class Drone:
         return None
 
     @property
+    def has_enough_scans(self) -> bool:
+        has_scanned_enough = len(self.scanned_creature_ids) >= SCAN_COUNT_TO_RETURN
+        has_enough_unique_scans = (
+            len(self.distinct_scanned_creature_ids) >= DISTINCT_SCAN_COUNT_TO_RETURN
+        )
+        player_has_scanned_enough = (
+            len(self.player.scanned_creature_ids) >= PLAYER_SCAN_COUNT_TO_RETURN
+        )
+        return (
+            has_scanned_enough and has_enough_unique_scans
+        ) or player_has_scanned_enough
+
+    @property
     def should_turn_on_light(self) -> bool:
         has_nearby_fishes = any(
             [
@@ -225,7 +238,11 @@ class Drone:
                 for fish_id in FISHES_BY_IDS.keys()
             ]
         )
-        return has_nearby_fishes and TURN_COUNT > LIGHT_TURN_COUNT and not self.last_turn_light
+        return (
+            has_nearby_fishes
+            and TURN_COUNT > LIGHT_TURN_COUNT
+            and not self.last_turn_light
+        )
 
     def reset_turn(self) -> None:
         self.target_creature_id = None
@@ -270,11 +287,7 @@ class Drone:
 
     def play_turn(self) -> None:
         # Early return
-        if (
-            (len(self.scanned_creature_ids) >= SCAN_COUNT_TO_RETURN
-            and len(self.distinct_scanned_creature_ids) >= DISTINCT_SCAN_COUNT_TO_RETURN)
-            or len(self.player.scanned_creature_ids) >= PLAYER_SCAN_COUNT_TO_RETURN
-        ):
+        if self.has_enough_scans:
             self.debug_text = "Save: 5"
             return self.go_straight_up()
         # Keep returning
