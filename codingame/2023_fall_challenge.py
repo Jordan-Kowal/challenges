@@ -260,7 +260,7 @@ class Drone:
             for c in sorted_creature_list
             if compute_distance(creature.position, c.position) < TRIANGULATE_DISTANCE
         ]
-        coordinates = compute_middle([c.next_position for c in close_fishes])
+        coordinates = compute_weighted_middle([c.next_position for c in close_fishes])
         # Move to target
         self.target_creature_id = creature.id
         return coordinates
@@ -376,8 +376,10 @@ class Drone:
         ]
         # Get best trajectory
         if not valid_trajectories:
+            self.debug_text += f" & stuck"
             return self.wait(self.should_turn_on_light)
         elif len(valid_trajectories) < 12:
+            self.debug_text += f" & avoid"
             valid_trajectories.sort(
                 key=lambda t: compute_distance((initial_x, initial_y), t[-1])
             )
@@ -742,6 +744,16 @@ def rotate_point_on_circle(center: Position, point: Position, degrees: int) -> P
 def compute_middle(points: List[Position]) -> Position:
     x = sum([p[0] for p in points]) // len(points)
     y = sum([p[1] for p in points]) // len(points)
+    return x, y
+
+
+def compute_weighted_middle(points: List[Position]) -> Position:
+    count = len(points)
+    if count == 1:
+        return points[0]
+    weights = [3] + [1] * (count - 1)
+    x = sum([p[0] * w for p, w in zip(points, weights)]) // sum(weights)
+    y = sum([p[1] * w for p, w in zip(points, weights)]) // sum(weights)
     return x, y
 
 
