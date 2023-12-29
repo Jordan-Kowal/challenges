@@ -225,17 +225,17 @@ class Drone:
                 for fish_id in FISHES_BY_IDS.keys()
             ]
         )
-        return has_nearby_fishes and TURN_COUNT > LIGHT_TURN_COUNT
+        return has_nearby_fishes and TURN_COUNT > LIGHT_TURN_COUNT and not self.last_turn_light
 
     def reset_turn(self) -> None:
         self.target_creature_id = None
 
-    def update_vitals(self, x: int, y: int, emergency: int, battery: int) -> None:
+    def update_vitals(self, x: int, y: int, emergency: int, new_battery: int) -> None:
         self.x = x
         self.y = y
         self.emergency = emergency
-        self.last_turn_light = self.battery > battery
-        self.battery = battery
+        self.last_turn_light = self.battery > new_battery
+        self.battery = new_battery
 
     def update_scans(self, scanned_ids: Set[int]) -> None:
         if len(scanned_ids) > len(self.scanned_creature_ids):
@@ -271,8 +271,9 @@ class Drone:
     def play_turn(self) -> None:
         # Early return
         if (
-            len(self.scanned_creature_ids) >= SCAN_COUNT_TO_RETURN
-            and len(self.distinct_scanned_creature_ids) >= DISTINCT_SCAN_COUNT_TO_RETURN
+            (len(self.scanned_creature_ids) >= SCAN_COUNT_TO_RETURN
+            and len(self.distinct_scanned_creature_ids) >= DISTINCT_SCAN_COUNT_TO_RETURN)
+            or len(self.player.scanned_creature_ids) >= PLAYER_SCAN_COUNT_TO_RETURN
         ):
             self.debug_text = "Save: 5"
             return self.go_straight_up()
@@ -897,14 +898,14 @@ SAME_COLOR_FACTOR = 1.2
 TRAJECTORY_STEP_COUNT = 100
 MONSTER_AVOID_RANGE = MONSTER_KILL_RANGE + 100
 
-LIGHT_TRIGGER_MIN_DISTANCE = LIGHT_MIN_DISTANCE
-LIGHT_TRIGGER_MAX_DISTANCE = LIGHT_MAX_DISTANCE
-LIGHT_TURN_COUNT = 4
+LIGHT_TRIGGER_MIN_DISTANCE = LIGHT_MIN_DISTANCE + 200
+LIGHT_TRIGGER_MAX_DISTANCE = LIGHT_MAX_DISTANCE + 1_000
+LIGHT_TURN_COUNT = 5
 
-INITIAL_TARGET_TURN_COUNT = 8
-INITIAL_Y_TARGET = 7_000
+INITIAL_TARGET_TURN_COUNT = 13
+INITIAL_Y_TARGET = 8_000
 
-PUSH_TURN_COUNT = 0
+PUSH_TURN_COUNT = 15
 PUSH_WALL_THRESHOLD = 1_500
 PUSH_DRONE_THRESHOLD = 1_500
 
@@ -912,7 +913,7 @@ TRIANGULATE_DISTANCE = 1_000
 
 SCAN_COUNT_TO_RETURN = 5
 DISTINCT_SCAN_COUNT_TO_RETURN = 4
-
+PLAYER_SCAN_COUNT_TO_RETURN = 9
 
 # --------------------------------------------------
 # Game
@@ -924,7 +925,7 @@ MONSTERS_BY_IDS: Dict[int, Creature] = {}
 MISSING_CREATURE_IDS: Set[int] = set()
 DRONE_CREATURE_DISTANCE: Dict[Tuple[int, int], int] = {}
 DRONE_CREATURE_DISTANCE_NEXT: Dict[Tuple[int, int], int] = {}
-DEBUG = False
+DEBUG = True
 
 ME = Player(is_me=True)
 FOE = Player(is_me=False)
