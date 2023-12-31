@@ -10,8 +10,8 @@ defmodule Mix.Tasks.Benchmark do
     Mix.Tasks.Day2,
     Mix.Tasks.Day3,
     Mix.Tasks.Day4,
-    Mix.Tasks.Day5
-    # Mix.Tasks.Day6,
+    Mix.Tasks.Day5,
+    Mix.Tasks.Day6
     # Mix.Tasks.Day7,
     # Mix.Tasks.Day8,
     # Mix.Tasks.Day9,
