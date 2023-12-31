@@ -188,7 +188,7 @@ class Drone:
         return [
             creature
             for creature in self.best_creatures
-            if creature.y < self.y and abs(creature.x - self.x) < 1500
+            if creature.y < self.y and abs(creature.x - self.x) < X_TOLERANCE_WHEN_UP
         ]
 
     @property
@@ -238,11 +238,7 @@ class Drone:
                 for fish_id in FISHES_BY_IDS.keys()
             ]
         )
-        return (
-            has_nearby_fishes
-            and TURN_COUNT > LIGHT_TURN_COUNT
-            and not self.last_turn_light
-        )
+        return has_nearby_fishes and TURN_COUNT > LIGHT_TURN_COUNT and not self.last_turn_light
 
     def reset_turn(self) -> None:
         self.target_creature_id = None
@@ -288,7 +284,7 @@ class Drone:
     def play_turn(self) -> None:
         # Early return
         if self.has_enough_scans:
-            self.debug_text = "Save: 5"
+            self.debug_text = "Save: enough scans"
             return self.go_straight_up()
         # Keep returning
         if self.is_returning and self.has_scans:
@@ -307,7 +303,8 @@ class Drone:
         # Initial movement
         if TURN_COUNT < INITIAL_TARGET_TURN_COUNT:
             self.debug_text = "Move: init"
-            return self.move(self.x, INITIAL_Y_TARGET)
+            x = INITIAL_X_TARGET_LEFT if self.x < GRID_WIDTH // 2 else INITIAL_X_TARGET_RIGHT
+            return self.move(x, INITIAL_Y_TARGET)
         # You dead
         if self.emergency > 0:
             self.debug_text = "Wait: dead"
@@ -888,10 +885,10 @@ def play_turn() -> None:
     for monster in MONSTERS_BY_IDS.values():
         if monster.is_visible:
             monster.compute_trajectory_for_turn()
-    # Saving now might make us win
-    if check_if_returning_wins():
-        for drone in ME.drones.values():
-            drone.is_returning = True
+    # # Saving now might make us win
+    # if check_if_returning_wins():
+    #     for drone in ME.drones.values():
+    #         drone.is_returning = True
     # Play
     for drone_id in ME.ordered_drone_ids:
         drone = ME.drones[drone_id]
@@ -904,29 +901,43 @@ def play_turn() -> None:
 # --------------------------------------------------
 # Params
 # --------------------------------------------------
-VALUE_FACTOR = 1.5
-SAME_TYPE_FACTOR = 1.2
-SAME_COLOR_FACTOR = 1.2
+# Score computing
+VALUE_FACTOR = 2.0
+SAME_TYPE_FACTOR = 1.0
+SAME_COLOR_FACTOR = 1.0
 
+# Monster avoidance
 TRAJECTORY_STEP_COUNT = 100
-MONSTER_AVOID_RANGE = MONSTER_KILL_RANGE + 100
+MONSTER_AVOID_RANGE = MONSTER_KILL_RANGE + 50
 
+# Light activation
 LIGHT_TRIGGER_MIN_DISTANCE = LIGHT_MIN_DISTANCE + 200
 LIGHT_TRIGGER_MAX_DISTANCE = LIGHT_MAX_DISTANCE + 1_000
-LIGHT_TURN_COUNT = 5
+LIGHT_TURN_COUNT = 6
 
-INITIAL_TARGET_TURN_COUNT = 13
+# Initial movement
+INITIAL_TARGET_TURN_COUNT = 10
 INITIAL_Y_TARGET = 8_000
+INITIAL_X_TARGET_LEFT = 3_000
+INITIAL_X_TARGET_RIGHT = 7_000
 
+# Pushing
 PUSH_TURN_COUNT = 15
 PUSH_WALL_THRESHOLD = 1_500
 PUSH_DRONE_THRESHOLD = 1_500
 
+# Moving
 TRIANGULATE_DISTANCE = 1_000
+X_TOLERANCE_WHEN_UP = 3_000
 
-SCAN_COUNT_TO_RETURN = 5
-DISTINCT_SCAN_COUNT_TO_RETURN = 4
-PLAYER_SCAN_COUNT_TO_RETURN = 9
+# Saving threshold
+SCAN_COUNT_TO_RETURN = 7
+DISTINCT_SCAN_COUNT_TO_RETURN = 5
+PLAYER_SCAN_COUNT_TO_RETURN = 10
+
+# Debug
+DEBUG = True
+
 
 # --------------------------------------------------
 # Game
@@ -938,8 +949,6 @@ MONSTERS_BY_IDS: Dict[int, Creature] = {}
 MISSING_CREATURE_IDS: Set[int] = set()
 DRONE_CREATURE_DISTANCE: Dict[Tuple[int, int], int] = {}
 DRONE_CREATURE_DISTANCE_NEXT: Dict[Tuple[int, int], int] = {}
-DEBUG = True
-
 ME = Player(is_me=True)
 FOE = Player(is_me=False)
 
