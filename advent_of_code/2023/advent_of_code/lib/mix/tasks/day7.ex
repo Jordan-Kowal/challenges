@@ -50,22 +50,41 @@ defmodule Mix.Tasks.Day7 do
   end
 
   @spec compute_hand_type(hand(), boolean()) :: hand_type()
-  defp compute_hand_type(hand, _) do
+  defp compute_hand_type(hand, jack_as_joker) do
+    jack_count = Enum.count(hand, &(&1 == "J"))
+
     hand
     |> Enum.frequencies()
     |> Map.values()
     |> Enum.sort()
     |> Enum.reverse()
-    |> case do
-      [5] -> :five_of_a_kind
-      [4, 1] -> :four_of_a_kind
-      [3, 2] -> :full_house
-      [3 | _] -> :three_of_a_kind
-      [2, 2 | _] -> :two_pairs
-      [2 | _] -> :one_pair
-      _ -> :high_card
-    end
+    |> update_hand_count_with_jacks(jack_count, jack_as_joker)
+    |> hand_type_from_card_count()
   end
+
+  @spec update_hand_count_with_jacks(
+          hand_count :: [integer()],
+          jack_count :: integer(),
+          jack_as_joker :: boolean()
+        ) :: [integer()]
+  defp update_hand_count_with_jacks(hand_count, _, false), do: hand_count
+
+  defp update_hand_count_with_jacks(hand_count, 0, _), do: hand_count
+  defp update_hand_count_with_jacks(hand_count, 5, _), do: hand_count
+
+  defp update_hand_count_with_jacks(hand_count, jack_count, _) do
+    [highest | rest] = List.delete(hand_count, jack_count)
+    [highest + jack_count | rest]
+  end
+
+  @spec hand_type_from_card_count([integer()]) :: hand_type()
+  defp hand_type_from_card_count([5]), do: :five_of_a_kind
+  defp hand_type_from_card_count([4, 1]), do: :four_of_a_kind
+  defp hand_type_from_card_count([3, 2]), do: :full_house
+  defp hand_type_from_card_count([3 | _]), do: :three_of_a_kind
+  defp hand_type_from_card_count([2, 2 | _]), do: :two_pairs
+  defp hand_type_from_card_count([2 | _]), do: :one_pair
+  defp hand_type_from_card_count([1 | _]), do: :high_card
 
   @spec compare_hands(hand_data(), hand_data(), boolean()) :: boolean()
   defp compare_hands({hand1, _, type1}, {hand2, _, type1}, jack_as_joker) do
@@ -92,7 +111,7 @@ defmodule Mix.Tasks.Day7 do
       "A" -> 14
       "K" -> 13
       "Q" -> 12
-      "J" -> if jack_as_joker, do: 11, else: 1
+      "J" -> if jack_as_joker, do: 1, else: 11
       "T" -> 10
       _ -> String.to_integer(card)
     end
