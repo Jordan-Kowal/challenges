@@ -188,7 +188,7 @@ class Drone:
         return [
             creature
             for creature in self.best_creatures
-            if creature.y < self.y and abs(creature.x - self.x) < X_TOLERANCE_WHEN_UP
+            if creature.y < self.y and X_TOLERANCE_WHEN_UP_MIN < abs(creature.x - self.x) < X_TOLERANCE_WHEN_UP_MAX
         ]
 
     @property
@@ -908,18 +908,18 @@ SAME_COLOR_FACTOR = 1.0
 
 # Monster avoidance
 TRAJECTORY_STEP_COUNT = 100
-MONSTER_AVOID_RANGE = MONSTER_KILL_RANGE + 50
+MONSTER_AVOID_RANGE = MONSTER_KILL_RANGE + 60
 
 # Light activation
 LIGHT_TRIGGER_MIN_DISTANCE = LIGHT_MIN_DISTANCE + 200
 LIGHT_TRIGGER_MAX_DISTANCE = LIGHT_MAX_DISTANCE + 1_000
-LIGHT_TURN_COUNT = 6
+LIGHT_TURN_COUNT = 5
 
 # Initial movement
 INITIAL_TARGET_TURN_COUNT = 8
 INITIAL_Y_TARGET = 8_000
-INITIAL_X_TARGET_LEFT = 2000
-INITIAL_X_TARGET_RIGHT = 8000
+INITIAL_X_TARGET_LEFT = 2_300
+INITIAL_X_TARGET_RIGHT = 7_700
 
 # Pushing
 PUSH_TURN_COUNT = 15
@@ -928,7 +928,8 @@ PUSH_DRONE_THRESHOLD = 1_500
 
 # Moving
 TRIANGULATE_DISTANCE = 1_000
-X_TOLERANCE_WHEN_UP = 3_000
+X_TOLERANCE_WHEN_UP_MIN = 1_000
+X_TOLERANCE_WHEN_UP_MAX = 2_500
 
 # Saving threshold
 SCAN_COUNT_TO_RETURN = 5

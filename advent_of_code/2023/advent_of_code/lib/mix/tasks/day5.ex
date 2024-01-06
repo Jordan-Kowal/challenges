@@ -86,7 +86,7 @@ defmodule Mix.Tasks.Day5 do
     |> String.to_atom()
   end
 
-  @spec find_seed_location(seed(), maps()) :: integer()
+  @spec recursive_find_seed_location(seed(), integer(), maps()) :: integer()
   defp recursive_find_seed_location(seed, 1, maps) do
     find_seed_location(seed, maps)
   end

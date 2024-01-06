@@ -44,7 +44,11 @@ defmodule Mix.Tasks.Day6 do
   end
 
   # Use quadratic equation to find the first and last point of the winning range
-  @spec compute_winning_presses(race()) :: [integer()]
+  @spec compute_winning_presses(race()) :: %Range{
+          :first => integer(),
+          :last => integer(),
+          :step => -1 | 1
+        }
   defp compute_winning_presses({time, distance}) do
     discriminant = :math.sqrt(time * time - 4 * distance)
 
